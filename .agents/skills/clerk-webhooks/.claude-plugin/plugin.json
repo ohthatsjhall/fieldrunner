@@ -9,6 +9,13 @@
   "license": "MIT",
   "homepage": "https://clerk.com/docs",
   "repository": "https://github.com/clerk/skills",
-  "keywords": ["webhooks", "events", "sync", "database", "notifications", "integrations"],
+  "keywords": [
+    "webhooks",
+    "events",
+    "sync",
+    "database",
+    "notifications",
+    "integrations"
+  ],
   "category": "authentication"
 }

@@ -49,7 +49,7 @@ const { orgId } = await auth();
 const getOrgData = unstable_cache(
   () => db.orgData.findMany({ where: { organizationId: orgId } }),
   [`org-${orgId}-data`],
-  { revalidate: 300, tags: [`org-${orgId}`] }
+  { revalidate: 300, tags: [`org-${orgId}`] },
 );
 ```
 

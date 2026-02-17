@@ -1,10 +1,4 @@
-import {
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { organizations } from './organizations';
 import { users } from './users';
@@ -23,10 +17,14 @@ export const organizationInvitations = pgTable('organization_invitations', {
   userId: uuid('user_id').references(() => users.id),
   publicMetadata: jsonb('public_metadata').$type<Record<string, unknown>>(),
   privateMetadata: jsonb('private_metadata').$type<Record<string, unknown>>(),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
 });
 

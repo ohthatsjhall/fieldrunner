@@ -5,7 +5,7 @@ allowed-tools: WebFetch
 license: MIT
 metadata:
   author: clerk
-  version: "1.0.0"
+  version: '1.0.0'
 ---
 
 # Organizations (B2B SaaS)
@@ -20,16 +20,16 @@ metadata:
 
 ## Documentation Reference
 
-| Task | Link |
-|------|------|
-| Overview | https://clerk.com/docs/guides/organizations/overview |
-| Org slugs in URLs | https://clerk.com/docs/guides/organizations/org-slugs-in-urls |
-| Roles & permissions | https://clerk.com/docs/guides/organizations/control-access/roles-and-permissions |
-| Check access | https://clerk.com/docs/guides/organizations/control-access/check-access |
-| Invitations | https://clerk.com/docs/guides/organizations/add-members/invitations |
-| OrganizationSwitcher | https://clerk.com/docs/reference/components/organization/organization-switcher |
-| Verified domains | https://clerk.com/docs/guides/organizations/verified-domains |
-| Enterprise SSO | https://clerk.com/docs/guides/organizations/add-members/sso |
+| Task                 | Link                                                                             |
+| -------------------- | -------------------------------------------------------------------------------- |
+| Overview             | https://clerk.com/docs/guides/organizations/overview                             |
+| Org slugs in URLs    | https://clerk.com/docs/guides/organizations/org-slugs-in-urls                    |
+| Roles & permissions  | https://clerk.com/docs/guides/organizations/control-access/roles-and-permissions |
+| Check access         | https://clerk.com/docs/guides/organizations/control-access/check-access          |
+| Invitations          | https://clerk.com/docs/guides/organizations/add-members/invitations              |
+| OrganizationSwitcher | https://clerk.com/docs/reference/components/organization/organization-switcher   |
+| Verified domains     | https://clerk.com/docs/guides/organizations/verified-domains                     |
+| Enterprise SSO       | https://clerk.com/docs/guides/organizations/add-members/sso                      |
 
 ## Key Patterns
 
@@ -38,10 +38,10 @@ metadata:
 Server-side access to organization:
 
 ```typescript
-import { auth } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server';
 
-const { orgId, orgSlug } = await auth()
-console.log(`Current org: ${orgSlug}`)
+const { orgId, orgSlug } = await auth();
+console.log(`Current org: ${orgSlug}`);
 ```
 
 ### 2. Dynamic Routes with Org Slug
@@ -112,21 +112,21 @@ export default function Nav() {
 
 All new members get assigned a role:
 
-| Role | Permissions |
-|------|-------------|
-| `org:admin` | Full access, manage members, settings |
-| `org:member` | Limited access, read-only |
+| Role         | Permissions                           |
+| ------------ | ------------------------------------- |
+| `org:admin`  | Full access, manage members, settings |
+| `org:member` | Limited access, read-only             |
 
 Custom roles can be created in the dashboard.
 
 ## Default Permissions
 
-| Permission | Role |
-|-----------|------|
-| `org:create` | Can create new organizations |
-| `org:manage_members` | Can invite/remove members (default: admin) |
-| `org:manage_roles` | Can change member roles (default: admin) |
-| `org:update_metadata` | Can update org metadata (default: admin) |
+| Permission            | Role                                       |
+| --------------------- | ------------------------------------------ |
+| `org:create`          | Can create new organizations               |
+| `org:manage_members`  | Can invite/remove members (default: admin) |
+| `org:manage_roles`    | Can change member roles (default: admin)   |
+| `org:update_metadata` | Can update org metadata (default: admin)   |
 
 ## Authorization Pattern
 
@@ -155,13 +155,13 @@ export default async function AdminPage({ params }: { params: { slug: string } }
 
 ## Common Pitfalls
 
-| Symptom | Cause | Solution |
-|---------|-------|----------|
-| `orgSlug` is undefined | Not calling `await auth()` | Use `const { orgSlug } = await auth()` |
-| Role check always fails | Not awaiting `auth()` | Add `await` before `auth()` |
-| Users can access other orgs | Not checking orgSlug matches URL | Verify `orgSlug === params.slug` |
-| Org not appearing in switcher | Organizations not enabled | Enable in Clerk Dashboard → Organizations |
-| Invitations not working | Wrong role configuration | Ensure members have invite role permissions |
+| Symptom                       | Cause                            | Solution                                    |
+| ----------------------------- | -------------------------------- | ------------------------------------------- |
+| `orgSlug` is undefined        | Not calling `await auth()`       | Use `const { orgSlug } = await auth()`      |
+| Role check always fails       | Not awaiting `auth()`            | Add `await` before `auth()`                 |
+| Users can access other orgs   | Not checking orgSlug matches URL | Verify `orgSlug === params.slug`            |
+| Org not appearing in switcher | Organizations not enabled        | Enable in Clerk Dashboard → Organizations   |
+| Invitations not working       | Wrong role configuration         | Ensure members have invite role permissions |
 
 ## Workflow
 

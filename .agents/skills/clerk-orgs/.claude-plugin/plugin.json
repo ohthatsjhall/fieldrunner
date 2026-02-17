@@ -9,6 +9,15 @@
   "license": "MIT",
   "homepage": "https://clerk.com/docs",
   "repository": "https://github.com/clerk/skills",
-  "keywords": ["organizations", "b2b", "saas", "multi-tenant", "rbac", "team-workspace", "sso", "verified-domains"],
+  "keywords": [
+    "organizations",
+    "b2b",
+    "saas",
+    "multi-tenant",
+    "rbac",
+    "team-workspace",
+    "sso",
+    "verified-domains"
+  ],
   "category": "authentication"
 }

@@ -5,7 +5,7 @@ allowed-tools: WebFetch
 license: MIT
 metadata:
   author: clerk
-  version: "1.0.0"
+  version: '1.0.0'
 ---
 
 # Webhooks
@@ -14,12 +14,12 @@ metadata:
 
 ## Documentation Reference
 
-| Task | Link |
-|------|------|
-| Overview | https://clerk.com/docs/guides/development/webhooks/overview |
-| Sync to database | https://clerk.com/docs/guides/development/webhooks/syncing |
-| Debugging | https://clerk.com/docs/guides/development/webhooks/debugging |
-| Event catalog | https://dashboard.clerk.com/~/webhooks (Event Catalog tab) |
+| Task             | Link                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| Overview         | https://clerk.com/docs/guides/development/webhooks/overview  |
+| Sync to database | https://clerk.com/docs/guides/development/webhooks/syncing   |
+| Debugging        | https://clerk.com/docs/guides/development/webhooks/debugging |
+| Event catalog    | https://dashboard.clerk.com/~/webhooks (Event Catalog tab)   |
 
 ## Quick Start
 
@@ -58,11 +58,13 @@ Full catalog: Dashboard → Webhooks → Event Catalog
 ## When to Sync
 
 **Do sync when:**
+
 - Need other users' data (social features, profiles)
 - Storing extra custom fields (birthday, country, bio)
 - Building notifications or integrations
 
 **Don't sync when:**
+
 - Only need current user data (use session token)
 - No custom fields (Clerk has everything)
 - Need immediate access (webhooks are eventual consistency)
@@ -80,8 +82,8 @@ Ensure `clerkMiddleware()` doesn't protect `/api/webhooks(.*)` path.
 Use correct import and single parameter:
 
 ```typescript
-import { verifyWebhook } from '@clerk/nextjs/webhooks'
-const evt = await verifyWebhook(req)  // Pass request directly
+import { verifyWebhook } from '@clerk/nextjs/webhooks';
+const evt = await verifyWebhook(req); // Pass request directly
 ```
 
 ### Type-Safe Events
@@ -103,8 +105,8 @@ Don't only listen to `user.created`. Also handle `user.updated` and `user.delete
 Return 200 immediately, queue long operations:
 
 ```typescript
-await queue.enqueue('process-webhook', evt)
-return new Response('Received', { status: 200 })
+await queue.enqueue('process-webhook', evt);
+return new Response('Received', { status: 200 });
 ```
 
 ## Webhook Reliability
@@ -115,14 +117,14 @@ return new Response('Received', { status: 200 })
 
 ## Common Pitfalls
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Verification fails | Wrong import or usage | Use `@clerk/nextjs/webhooks`, pass `req` directly |
-| Route not found (404) | Wrong path | Use `/api/webhooks` |
-| Not authorized (401) | Route is protected | Make route public |
-| No data in DB | Async job pending | Wait/check logs |
-| Duplicate entries | Only handling `user.created` | Also handle `user.updated` |
-| Timeouts | Handler too slow | Queue async work |
+| Symptom               | Cause                        | Fix                                               |
+| --------------------- | ---------------------------- | ------------------------------------------------- |
+| Verification fails    | Wrong import or usage        | Use `@clerk/nextjs/webhooks`, pass `req` directly |
+| Route not found (404) | Wrong path                   | Use `/api/webhooks`                               |
+| Not authorized (401)  | Route is protected           | Make route public                                 |
+| No data in DB         | Async job pending            | Wait/check logs                                   |
+| Duplicate entries     | Only handling `user.created` | Also handle `user.updated`                        |
+| Timeouts              | Handler too slow             | Queue async work                                  |
 
 ## Testing & Deployment
 

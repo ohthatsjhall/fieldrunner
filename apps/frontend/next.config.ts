@@ -1,9 +1,9 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@fieldrunner/shared"],
+  transpilePackages: ['@fieldrunner/shared'],
   turbopack: {
-    root: __dirname + "/../..",
+    root: __dirname + '/../..',
   },
 };
 

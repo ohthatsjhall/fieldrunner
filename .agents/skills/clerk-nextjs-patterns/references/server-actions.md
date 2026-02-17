@@ -27,7 +27,8 @@ import { auth } from '@clerk/nextjs/server';
 export async function createTeamProject(formData: FormData) {
   const { userId, orgId, orgRole } = await auth();
   if (!userId || !orgId) throw new Error('Must be in an organization');
-  if (orgRole !== 'org:admin') throw new Error('Only admins can create projects');
+  if (orgRole !== 'org:admin')
+    throw new Error('Only admins can create projects');
 
   const name = formData.get('name') as string;
   await db.projects.create({ data: { name, organizationId: orgId } });

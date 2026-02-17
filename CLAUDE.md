@@ -74,16 +74,16 @@ Types in `packages/shared/src/database.ts` are **manually defined** to match the
 
 All tables mirror Clerk entities synced via webhooks. Each uses a UUID internal PK (`id`) plus a unique `clerk_id` text column for the Clerk identifier.
 
-| Table | Source | Key Relations |
-|---|---|---|
-| `users` | user.created/updated/deleted | has many memberships, invitations |
-| `organizations` | organization.created/updated/deleted | has many memberships, invitations, domains |
-| `organization_memberships` | organizationMembership.* | belongs to user + organization |
-| `organization_invitations` | organizationInvitation.* | belongs to organization, optionally to user |
-| `organization_domains` | organizationDomain.* | belongs to organization |
-| `roles` | role.* | many-to-many with permissions |
-| `permissions` | permission.* | many-to-many with roles |
-| `role_permissions` | (junction table) | joins roles + permissions |
+| Table                      | Source                               | Key Relations                               |
+| -------------------------- | ------------------------------------ | ------------------------------------------- |
+| `users`                    | user.created/updated/deleted         | has many memberships, invitations           |
+| `organizations`            | organization.created/updated/deleted | has many memberships, invitations, domains  |
+| `organization_memberships` | organizationMembership.\*            | belongs to user + organization              |
+| `organization_invitations` | organizationInvitation.\*            | belongs to organization, optionally to user |
+| `organization_domains`     | organizationDomain.\*                | belongs to organization                     |
+| `roles`                    | role.\*                              | many-to-many with permissions               |
+| `permissions`              | permission.\*                        | many-to-many with roles                     |
+| `role_permissions`         | (junction table)                     | joins roles + permissions                   |
 
 ## API Conventions
 

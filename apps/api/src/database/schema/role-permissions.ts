@@ -1,8 +1,4 @@
-import {
-  pgTable,
-  primaryKey,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { roles } from './roles';
 import { permissions } from './permissions';
@@ -17,9 +13,7 @@ export const rolePermissions = pgTable(
       .references(() => permissions.id)
       .notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.roleId, table.permissionId] }),
-  ],
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionId] })],
 );
 
 export const rolePermissionsRelations = relations(

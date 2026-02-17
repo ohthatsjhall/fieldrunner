@@ -21,10 +21,14 @@ export const organizationDomains = pgTable('organization_domains', {
   verification: jsonb('verification').$type<Record<string, unknown> | null>(),
   totalPendingInvitations: integer('total_pending_invitations').default(0),
   totalPendingSuggestions: integer('total_pending_suggestions').default(0),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
 });
 

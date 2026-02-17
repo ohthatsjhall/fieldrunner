@@ -35,10 +35,14 @@ export const users = pgTable('users', {
     withTimezone: true,
     mode: 'date',
   }),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
 });
 

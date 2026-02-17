@@ -26,18 +26,19 @@ export const organizations = pgTable('organizations', {
   adminDeleteEnabled: boolean('admin_delete_enabled').default(true),
   publicMetadata: jsonb('public_metadata').$type<Record<string, unknown>>(),
   privateMetadata: jsonb('private_metadata').$type<Record<string, unknown>>(),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
-    .notNull(),
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+    mode: 'date',
+  }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
 });
 
-export const organizationsRelations = relations(
-  organizations,
-  ({ many }) => ({
-    memberships: many(organizationMemberships),
-    invitations: many(organizationInvitations),
-    domains: many(organizationDomains),
-  }),
-);
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  memberships: many(organizationMemberships),
+  invitations: many(organizationInvitations),
+  domains: many(organizationDomains),
+}));

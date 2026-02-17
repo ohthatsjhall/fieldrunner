@@ -5,7 +5,7 @@ allowed-tools: WebFetch
 license: MIT
 metadata:
   author: clerk
-  version: "1.0.0"
+  version: '1.0.0'
 ---
 
 # Component Customization
@@ -14,14 +14,14 @@ metadata:
 
 ## Component Customization Options
 
-| Task | Documentation |
-|------|---------------|
-| Appearance prop overview | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/overview |
-| Layout (structure, logo, buttons) | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/layout |
-| Themes (pre-built dark/light) | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/themes |
-| Variables (colors, fonts, spacing) | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/variables |
-| CAPTCHA configuration | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/captcha |
-| Bring your own CSS | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/bring-your-own-css |
+| Task                               | Documentation                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| Appearance prop overview           | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/overview           |
+| Layout (structure, logo, buttons)  | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/layout             |
+| Themes (pre-built dark/light)      | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/themes             |
+| Variables (colors, fonts, spacing) | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/variables          |
+| CAPTCHA configuration              | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/captcha            |
+| Bring your own CSS                 | https://clerk.com/docs/nextjs/guides/customizing-clerk/appearance-prop/bring-your-own-css |
 
 ## Appearance Pattern
 
@@ -42,19 +42,19 @@ metadata:
 
 ### variables (colors, typography, borders)
 
-| Property | Description |
-|----------|-------------|
-| `colorPrimary` | Primary color throughout |
-| `colorBackground` | Background color |
-| `borderRadius` | Border radius (default: `0.375rem`) |
+| Property          | Description                         |
+| ----------------- | ----------------------------------- |
+| `colorPrimary`    | Primary color throughout            |
+| `colorBackground` | Background color                    |
+| `borderRadius`    | Border radius (default: `0.375rem`) |
 
 ### layout (structure, logo, social buttons)
 
-| Property | Description |
-|----------|-------------|
-| `logoImageUrl` | URL to custom logo |
-| `socialButtonsVariant` | `'blockButton'` \| `'iconButton'` \| `'auto'` |
-| `socialButtonsPlacement` | `'top'` \| `'bottom'` |
+| Property                 | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| `logoImageUrl`           | URL to custom logo                            |
+| `socialButtonsVariant`   | `'blockButton'` \| `'iconButton'` \| `'auto'` |
+| `socialButtonsPlacement` | `'top'` \| `'bottom'`                         |
 
 ## shadcn Theme
 
@@ -71,10 +71,12 @@ import { shadcn } from '@clerk/themes'
 ```
 
 Also import shadcn CSS in your global.css:
+
 ```css
 @import 'tailwindcss';
 @import '@clerk/themes/shadcn.css';
 ```
+
 ## Workflow
 
 1. Identify customization needs (colors, layout, theme, CSS)
@@ -84,9 +86,9 @@ Also import shadcn CSS in your global.css:
 
 ## Common Pitfalls
 
-| Issue | Solution |
-|-------|----------|
-| Colors not applying | Use `colorPrimary` not `primaryColor` |
-| Logo not showing | Put `logoImageUrl` inside `layout: {}` |
-| Social buttons wrong | Add `socialButtonsVariant: 'iconButton'` in `layout` |
-| Styling not working | Use appearance prop, not direct CSS (unless with bring-your-own-css) |
+| Issue                | Solution                                                             |
+| -------------------- | -------------------------------------------------------------------- |
+| Colors not applying  | Use `colorPrimary` not `primaryColor`                                |
+| Logo not showing     | Put `logoImageUrl` inside `layout: {}`                               |
+| Social buttons wrong | Add `socialButtonsVariant: 'iconButton'` in `layout`                 |
+| Styling not working  | Use appearance prop, not direct CSS (unless with bring-your-own-css) |
