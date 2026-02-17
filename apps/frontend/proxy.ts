@@ -10,7 +10,7 @@ export default clerkMiddleware(
   },
   {
     organizationSyncOptions: {
-      organizationPatterns: ['/org/:slug', '/org/:slug/(.*)'],
+      organizationPatterns: ['/org', '/org/:slug', '/org/:slug/(.*)'],
     },
   },
 );
