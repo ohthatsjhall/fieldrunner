@@ -49,6 +49,42 @@ Turbo task dependencies: `build`, `lint`, and `test` all depend on `^build` (sha
 - API uses flat ESLint config (`eslint.config.mjs`) with TypeScript + Prettier rules
 - Frontend uses Next.js ESLint config with core web vitals
 
+## Database
+
+- **ORM**: Drizzle ORM with PostgreSQL. Schema files in `apps/api/src/database/schema/`.
+- **Local dev**: Local PostgreSQL on port 5432, database `fieldrunner`. Use `drizzle-kit push` for schema changes.
+- **Staging/Production**: Neon.tech (serverless PostgreSQL). Will use `drizzle-kit generate` + `drizzle-kit migrate`.
+- **Dual-driver**: Connection factory in `apps/api/src/database/index.ts` auto-selects `node-postgres` (local) or `@neondatabase/serverless` (Neon) based on the `DATABASE_URL`.
+- **NestJS integration**: `DatabaseModule` is global. Inject via `@Inject(DATABASE_CONNECTION)` to access the Drizzle client.
+- **Soft deletes**: All entity tables have a nullable `deleted_at` column. Never hard-delete synced Clerk data.
+
+```bash
+# Database commands (from apps/api/)
+bun run db:push      # Push schema to local DB (dev workflow)
+bun run db:studio    # Open Drizzle Studio GUI
+bun run db:generate  # Generate migration files
+bun run db:migrate   # Run migrations
+```
+
+### Shared Types Constraint
+
+Types in `packages/shared/src/database.ts` are **manually defined** to match the Drizzle schema. They cannot use Drizzle's `$inferSelect` because `packages/shared` builds before `apps/api` in the Turbo pipeline (shared can't import from api). **When you modify a schema column, you must also update the corresponding type in `packages/shared/src/database.ts`.**
+
+### Schema Tables
+
+All tables mirror Clerk entities synced via webhooks. Each uses a UUID internal PK (`id`) plus a unique `clerk_id` text column for the Clerk identifier.
+
+| Table | Source | Key Relations |
+|---|---|---|
+| `users` | user.created/updated/deleted | has many memberships, invitations |
+| `organizations` | organization.created/updated/deleted | has many memberships, invitations, domains |
+| `organization_memberships` | organizationMembership.* | belongs to user + organization |
+| `organization_invitations` | organizationInvitation.* | belongs to organization, optionally to user |
+| `organization_domains` | organizationDomain.* | belongs to organization |
+| `roles` | role.* | many-to-many with permissions |
+| `permissions` | permission.* | many-to-many with roles |
+| `role_permissions` | (junction table) | joins roles + permissions |
+
 ## API Conventions
 
 - NestJS modular architecture. `ConfigModule` is global — inject `ConfigService` to read env vars.
