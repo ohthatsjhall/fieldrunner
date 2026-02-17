@@ -6,3 +6,4 @@ export * from './organization-domains';
 export * from './roles';
 export * from './permissions';
 export * from './role-permissions';
+export * from './webhook-events';

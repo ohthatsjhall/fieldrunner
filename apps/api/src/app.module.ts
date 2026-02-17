@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { DebugModule } from './debug/debug.module';
 import { DatabaseModule } from './database/database.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { DatabaseModule } from './database/database.module';
     AuthModule,
     HealthModule,
     DebugModule,
+    WebhooksModule,
   ],
   controllers: [],
   providers: [],
