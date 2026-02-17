@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { DebugModule } from './debug/debug.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { DebugModule } from './debug/debug.module';
         };
       },
     }),
+    DatabaseModule,
     AuthModule,
     HealthModule,
     DebugModule,
