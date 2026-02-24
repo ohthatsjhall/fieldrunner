@@ -291,6 +291,212 @@ describe('Webhooks (e2e)', () => {
       );
     });
 
+    // ─── New handler event type routing ────────────────────────────
+
+    it('should return 200 with "processed" status for permission.created event', () => {
+      const permissionPayload = {
+        type: 'permission.created',
+        data: {
+          id: 'perm_123',
+          object: 'permission',
+          key: 'org:docs:read',
+          name: 'Read Docs',
+          description: 'Read documents',
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(permissionPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockResolvedValue(undefined);
+      mockWebhooksService.markProcessed.mockResolvedValue(undefined);
+
+      return request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(permissionPayload)
+        .expect(200)
+        .expect((res: request.Response) => {
+          const body = res.body as { status: string; clerkEventId: string };
+          expect(body.status).toBe('processed');
+        });
+    });
+
+    it('should return 200 with "processed" status for organizationDomain.created event', () => {
+      const domainPayload = {
+        type: 'organizationDomain.created',
+        data: {
+          id: 'orgdmn_123',
+          object: 'organization_domain',
+          name: 'example.com',
+          organization_id: 'org_123',
+          enrollment_mode: 'automatic_invitation',
+          affiliation_email_address: null,
+          verification: null,
+          total_pending_invitations: 0,
+          total_pending_suggestions: 0,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(domainPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockResolvedValue(undefined);
+      mockWebhooksService.markProcessed.mockResolvedValue(undefined);
+
+      return request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(domainPayload)
+        .expect(200)
+        .expect((res: request.Response) => {
+          const body = res.body as { status: string; clerkEventId: string };
+          expect(body.status).toBe('processed');
+        });
+    });
+
+    it('should return 200 with "processed" status for organizationInvitation.created event', () => {
+      const invitationPayload = {
+        type: 'organizationInvitation.created',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          status: 'pending',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(invitationPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockResolvedValue(undefined);
+      mockWebhooksService.markProcessed.mockResolvedValue(undefined);
+
+      return request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(invitationPayload)
+        .expect(200)
+        .expect((res: request.Response) => {
+          const body = res.body as { status: string; clerkEventId: string };
+          expect(body.status).toBe('processed');
+        });
+    });
+
+    it('should return 200 with "processed" status for organizationInvitation.accepted event', () => {
+      const acceptedPayload = {
+        type: 'organizationInvitation.accepted',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          user_id: 'user_456',
+          status: 'accepted',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1700000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(acceptedPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockResolvedValue(undefined);
+      mockWebhooksService.markProcessed.mockResolvedValue(undefined);
+
+      return request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(acceptedPayload)
+        .expect(200)
+        .expect((res: request.Response) => {
+          const body = res.body as { status: string; clerkEventId: string };
+          expect(body.status).toBe('processed');
+        });
+    });
+
+    it('should return 200 with "processed" status for organizationInvitation.revoked event', () => {
+      const revokedPayload = {
+        type: 'organizationInvitation.revoked',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          status: 'revoked',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1700000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(revokedPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockResolvedValue(undefined);
+      mockWebhooksService.markProcessed.mockResolvedValue(undefined);
+
+      return request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(revokedPayload)
+        .expect(200)
+        .expect((res: request.Response) => {
+          const body = res.body as { status: string; clerkEventId: string };
+          expect(body.status).toBe('processed');
+        });
+    });
+
+    it('should return 5xx when domain FK lookup fails (triggers retry)', async () => {
+      const domainPayload = {
+        type: 'organizationDomain.created',
+        data: {
+          id: 'orgdmn_123',
+          object: 'organization_domain',
+          name: 'example.com',
+          organization_id: 'org_missing',
+          enrollment_mode: 'automatic_invitation',
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      };
+
+      mockWebhooksService.verifyWebhook.mockReturnValue(domainPayload);
+      mockWebhooksService.logEvent.mockResolvedValue(true);
+      mockWebhooksService.processEvent.mockRejectedValue(
+        new Error(
+          'Referenced entity not found: org=false (orgClerkId=org_missing)',
+        ),
+      );
+      mockWebhooksService.markFailed.mockResolvedValue(undefined);
+
+      const res = await request(app.getHttpServer())
+        .post('/webhooks')
+        .set(validHeaders)
+        .send(domainPayload);
+
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    });
+
     it('should pass svix headers to verifyWebhook', async () => {
       mockWebhooksService.verifyWebhook.mockReturnValue(validPayload);
       mockWebhooksService.logEvent.mockResolvedValue(true);

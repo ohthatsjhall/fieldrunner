@@ -12,6 +12,8 @@ import type {
   UserJSON,
   OrganizationJSON,
   OrganizationMembershipJSON,
+  OrganizationDomainJSON,
+  OrganizationInvitationJSON,
 } from '@clerk/backend';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import type { Database } from '../database';
@@ -20,10 +22,16 @@ import {
   users,
   organizations,
   organizationMemberships,
+  organizationDomains,
+  organizationInvitations,
+  permissions,
 } from '../database/schema';
 import { mapUserPayload } from './mappers/user.mapper';
 import { mapOrganizationPayload } from './mappers/organization.mapper';
 import { mapMembershipPayload } from './mappers/membership.mapper';
+import { mapPermissionPayload } from './mappers/permission.mapper';
+import { mapDomainPayload } from './mappers/domain.mapper';
+import { mapInvitationPayload } from './mappers/invitation.mapper';
 
 interface SvixHeaders {
   'svix-id': string;
@@ -146,13 +154,13 @@ export class WebhooksService {
       case 'organizationInvitation.accepted':
       case 'organizationInvitation.created':
       case 'organizationInvitation.revoked':
-        this.handleInvitationEvent(event);
+        await this.handleInvitationEvent(event);
         break;
 
       case 'organizationDomain.created':
       case 'organizationDomain.updated':
       case 'organizationDomain.deleted':
-        this.handleDomainEvent(event);
+        await this.handleDomainEvent(event);
         break;
 
       case 'role.created':
@@ -164,7 +172,7 @@ export class WebhooksService {
       case 'permission.created':
       case 'permission.updated':
       case 'permission.deleted':
-        this.handlePermissionEvent(event);
+        await this.handlePermissionEvent(event);
         break;
 
       default:
@@ -341,31 +349,198 @@ export class WebhooksService {
       });
   }
 
-  // ─── Entity Handlers (stubs — Phase 2) ───────────────────────────
+  // ─── Entity Handlers (Phase 2) ───────────────────────────────────
 
-  private handleInvitationEvent(event: WebhookEvent): void {
-    this.logger.log('Invitation event handler not yet implemented', {
+  /**
+   * Handles permission.created, permission.updated, and permission.deleted events.
+   * Created/updated: idempotent upsert via INSERT ON CONFLICT DO UPDATE.
+   * Deleted: soft delete by setting deletedAt.
+   */
+  private async handlePermissionEvent(event: WebhookEvent): Promise<void> {
+    if (event.type === 'permission.deleted') {
+      const clerkId = (event.data as unknown as Record<string, unknown>)
+        .id as string;
+
+      this.logger.log('Soft-deleting permission', { clerkId });
+
+      await this.db
+        .update(permissions)
+        .set({ deletedAt: new Date() })
+        .where(eq(permissions.clerkId, clerkId));
+
+      return;
+    }
+
+    const data = event.data as unknown as Parameters<
+      typeof mapPermissionPayload
+    >[0];
+    const values = mapPermissionPayload(data);
+
+    this.logger.log('Upserting permission', {
+      clerkId: values.clerkId,
       eventType: event.type,
-      clerkId: (event.data as unknown as Record<string, unknown>).id,
     });
+
+    await this.db
+      .insert(permissions)
+      .values(values)
+      .onConflictDoUpdate({
+        target: permissions.clerkId,
+        set: omit(values, 'clerkId'),
+      });
   }
 
-  private handleDomainEvent(event: WebhookEvent): void {
-    this.logger.log('Domain event handler not yet implemented', {
-      eventType: event.type,
-      clerkId: (event.data as unknown as Record<string, unknown>).id,
+  /**
+   * Handles organizationDomain.created, updated, and deleted events.
+   * Resolves Clerk organization ID to internal UUID for FK column before upserting.
+   * Throws if referenced organization is not yet synced, causing Svix to retry.
+   */
+  private async handleDomainEvent(event: WebhookEvent): Promise<void> {
+    if (event.type === 'organizationDomain.deleted') {
+      const clerkId = (event.data as unknown as Record<string, unknown>)
+        .id as string;
+
+      this.logger.log('Soft-deleting organization domain', { clerkId });
+
+      await this.db
+        .update(organizationDomains)
+        .set({ deletedAt: new Date() })
+        .where(eq(organizationDomains.clerkId, clerkId));
+
+      return;
+    }
+
+    const data = event.data as unknown as OrganizationDomainJSON;
+    const mapped = mapDomainPayload(data);
+    const { clerkOrganizationId, ...baseValues } = mapped;
+
+    this.logger.log('Resolving FK reference for domain', {
+      clerkId: mapped.clerkId,
+      clerkOrganizationId,
     });
+
+    const [org] = await this.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.clerkId, clerkOrganizationId));
+
+    if (!org) {
+      throw new Error(
+        `Referenced entity not found: org=false ` +
+          `(orgClerkId=${clerkOrganizationId})`,
+      );
+    }
+
+    const values = {
+      ...baseValues,
+      organizationId: org.id,
+    };
+
+    this.logger.log('Upserting organization domain', {
+      clerkId: mapped.clerkId,
+      organizationId: org.id,
+      eventType: event.type,
+    });
+
+    await this.db
+      .insert(organizationDomains)
+      .values(values)
+      .onConflictDoUpdate({
+        target: organizationDomains.clerkId,
+        set: omit(values, 'clerkId'),
+      });
   }
+
+  /**
+   * Handles organizationInvitation.created, accepted, and revoked events.
+   * Created: upsert with org FK lookup (userId is null).
+   * Accepted: upsert with org + user FK lookups.
+   * Revoked: soft delete by setting deletedAt.
+   */
+  private async handleInvitationEvent(event: WebhookEvent): Promise<void> {
+    if (event.type === 'organizationInvitation.revoked') {
+      const clerkId = (event.data as unknown as Record<string, unknown>)
+        .id as string;
+
+      this.logger.log('Soft-deleting organization invitation', { clerkId });
+
+      await this.db
+        .update(organizationInvitations)
+        .set({ deletedAt: new Date() })
+        .where(eq(organizationInvitations.clerkId, clerkId));
+
+      return;
+    }
+
+    const data = event.data as unknown as OrganizationInvitationJSON;
+    const mapped = mapInvitationPayload(data);
+    const { clerkOrganizationId, ...baseValues } = mapped;
+
+    this.logger.log('Resolving FK references for invitation', {
+      clerkId: mapped.clerkId,
+      clerkOrganizationId,
+    });
+
+    // FK lookup: resolve organization
+    const [org] = await this.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.clerkId, clerkOrganizationId));
+
+    if (!org) {
+      throw new Error(
+        `Referenced entity not found: org=false ` +
+          `(orgClerkId=${clerkOrganizationId})`,
+      );
+    }
+
+    // FK lookup: resolve user on accepted events
+    let userId: string | null = null;
+    if (event.type === 'organizationInvitation.accepted') {
+      const acceptedData = event.data as unknown as Record<string, unknown>;
+      const clerkUserId = acceptedData.user_id as string;
+
+      const [user] = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId));
+
+      if (!user) {
+        throw new Error(
+          `Referenced entity not found: user=false ` +
+            `(userClerkId=${clerkUserId})`,
+        );
+      }
+
+      userId = user.id;
+    }
+
+    const values = {
+      ...baseValues,
+      organizationId: org.id,
+      userId,
+    };
+
+    this.logger.log('Upserting organization invitation', {
+      clerkId: mapped.clerkId,
+      organizationId: org.id,
+      userId,
+      eventType: event.type,
+    });
+
+    await this.db
+      .insert(organizationInvitations)
+      .values(values)
+      .onConflictDoUpdate({
+        target: organizationInvitations.clerkId,
+        set: omit(values, 'clerkId'),
+      });
+  }
+
+  // ─── Entity Handler (stub — Phase 3) ───────────────────────────
 
   private handleRoleEvent(event: WebhookEvent): void {
     this.logger.log('Role event handler not yet implemented', {
-      eventType: event.type,
-      clerkId: (event.data as unknown as Record<string, unknown>).id,
-    });
-  }
-
-  private handlePermissionEvent(event: WebhookEvent): void {
-    this.logger.log('Permission event handler not yet implemented', {
       eventType: event.type,
       clerkId: (event.data as unknown as Record<string, unknown>).id,
     });

@@ -422,37 +422,281 @@ describe('WebhooksService', () => {
       await expect(service.processEvent(event)).resolves.toBeUndefined();
     });
 
-    it('should handle invitation events without throwing (stub handler)', async () => {
+    // ─── Permission handler ────────────────────────────────────────
+
+    it('should route permission.created to handlePermissionEvent (upsert)', async () => {
       const event = {
-        type: 'organizationInvitation.created',
-        data: { id: 'inv_123' },
+        type: 'permission.created',
+        data: {
+          id: 'perm_123',
+          object: 'permission',
+          key: 'org:docs:read',
+          name: 'Read Docs',
+          description: 'Read documents',
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
       } as unknown as WebhookEvent;
 
-      await expect(service.processEvent(event)).resolves.toBeUndefined();
+      await service.processEvent(event);
+
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
     });
 
-    it('should handle domain events without throwing (stub handler)', async () => {
+    it('should route permission.updated to handlePermissionEvent (upsert)', async () => {
+      const event = {
+        type: 'permission.updated',
+        data: {
+          id: 'perm_123',
+          object: 'permission',
+          key: 'org:docs:read',
+          name: 'Read Documents',
+          description: 'Updated description',
+          created_at: 1690000000000,
+          updated_at: 1700000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it('should route permission.deleted to handlePermissionEvent (soft delete)', async () => {
+      const event = {
+        type: 'permission.deleted',
+        data: { id: 'perm_123' },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.set).toHaveBeenCalledWith(
+        expect.objectContaining({ deletedAt: expect.any(Date) }),
+      );
+    });
+
+    // ─── Domain handler ─────────────────────────────────────────────
+
+    it('should route organizationDomain.created to handleDomainEvent (upsert with FK)', async () => {
+      // Mock FK lookup: organization found
+      mockDb.where
+        .mockResolvedValueOnce([{ id: '550e8400-e29b-41d4-a716-446655440000' }])
+        .mockResolvedValue(undefined);
+
       const event = {
         type: 'organizationDomain.created',
-        data: { id: 'dom_123' },
+        data: {
+          id: 'orgdmn_123',
+          object: 'organization_domain',
+          name: 'example.com',
+          organization_id: 'org_123',
+          enrollment_mode: 'automatic_invitation',
+          affiliation_email_address: null,
+          verification: null,
+          total_pending_invitations: 0,
+          total_pending_suggestions: 0,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
       } as unknown as WebhookEvent;
 
-      await expect(service.processEvent(event)).resolves.toBeUndefined();
+      await service.processEvent(event);
+
+      expect(mockDb.select).toHaveBeenCalledTimes(1);
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
     });
+
+    it('should route organizationDomain.deleted to handleDomainEvent (soft delete)', async () => {
+      const event = {
+        type: 'organizationDomain.deleted',
+        data: { id: 'orgdmn_123' },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.set).toHaveBeenCalledWith(
+        expect.objectContaining({ deletedAt: expect.any(Date) }),
+      );
+    });
+
+    it('should throw when domain FK lookup fails (org not found)', async () => {
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const event = {
+        type: 'organizationDomain.created',
+        data: {
+          id: 'orgdmn_123',
+          object: 'organization_domain',
+          name: 'example.com',
+          organization_id: 'org_missing',
+          enrollment_mode: 'automatic_invitation',
+          affiliation_email_address: null,
+          verification: null,
+          total_pending_invitations: 0,
+          total_pending_suggestions: 0,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await expect(service.processEvent(event)).rejects.toThrow(
+        'Referenced entity not found',
+      );
+    });
+
+    // ─── Invitation handler ─────────────────────────────────────────
+
+    it('should route organizationInvitation.created to handleInvitationEvent (upsert with org FK)', async () => {
+      // Mock FK lookup: organization found
+      mockDb.where
+        .mockResolvedValueOnce([{ id: '550e8400-e29b-41d4-a716-446655440000' }])
+        .mockResolvedValue(undefined);
+
+      const event = {
+        type: 'organizationInvitation.created',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          status: 'pending',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      // One select call for org FK lookup
+      expect(mockDb.select).toHaveBeenCalledTimes(1);
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it('should route organizationInvitation.accepted to handleInvitationEvent (upsert with org + user FK)', async () => {
+      // Mock FK lookups: organization found, then user found
+      mockDb.where
+        .mockResolvedValueOnce([{ id: '550e8400-e29b-41d4-a716-446655440000' }])
+        .mockResolvedValueOnce([{ id: '550e8400-e29b-41d4-a716-446655440001' }])
+        .mockResolvedValue(undefined);
+
+      const event = {
+        type: 'organizationInvitation.accepted',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          user_id: 'user_456',
+          status: 'accepted',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1700000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      // Two select calls: org + user FK lookups
+      expect(mockDb.select).toHaveBeenCalledTimes(2);
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+
+    it('should route organizationInvitation.revoked to handleInvitationEvent (soft delete)', async () => {
+      const event = {
+        type: 'organizationInvitation.revoked',
+        data: { id: 'orginv_123' },
+      } as unknown as WebhookEvent;
+
+      await service.processEvent(event);
+
+      expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.set).toHaveBeenCalledWith(
+        expect.objectContaining({ deletedAt: expect.any(Date) }),
+      );
+    });
+
+    it('should throw when invitation FK lookup fails (org not found)', async () => {
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const event = {
+        type: 'organizationInvitation.created',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_missing',
+          status: 'pending',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1690000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await expect(service.processEvent(event)).rejects.toThrow(
+        'Referenced entity not found',
+      );
+    });
+
+    it('should throw when invitation accepted FK lookup fails (user not found)', async () => {
+      // org found, user not found
+      mockDb.where
+        .mockResolvedValueOnce([{ id: '550e8400-e29b-41d4-a716-446655440000' }])
+        .mockResolvedValueOnce([]);
+
+      const event = {
+        type: 'organizationInvitation.accepted',
+        data: {
+          id: 'orginv_123',
+          object: 'organization_invitation',
+          email_address: 'invitee@example.com',
+          role: 'org:member',
+          role_name: 'Member',
+          organization_id: 'org_123',
+          user_id: 'user_missing',
+          status: 'accepted',
+          expires_at: 1700100000000,
+          public_metadata: {},
+          private_metadata: {},
+          url: null,
+          created_at: 1690000000000,
+          updated_at: 1700000000000,
+        },
+      } as unknown as WebhookEvent;
+
+      await expect(service.processEvent(event)).rejects.toThrow(
+        'Referenced entity not found',
+      );
+    });
+
+    // ─── Role handler (stub) ────────────────────────────────────────
 
     it('should handle role events without throwing (stub handler)', async () => {
       const event = {
         type: 'role.created',
         data: { id: 'role_123' },
-      } as unknown as WebhookEvent;
-
-      await expect(service.processEvent(event)).resolves.toBeUndefined();
-    });
-
-    it('should handle permission events without throwing (stub handler)', async () => {
-      const event = {
-        type: 'permission.created',
-        data: { id: 'perm_123' },
       } as unknown as WebhookEvent;
 
       await expect(service.processEvent(event)).resolves.toBeUndefined();
