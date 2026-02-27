@@ -1,24 +1,17 @@
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service';
-import { DATABASE_CONNECTION } from '../database/database.module';
+import { DATABASE_CONNECTION } from '../core/database/database.module';
 import type { WebhookEvent } from '@clerk/backend';
 
-jest.mock('svix', () => {
-  const mockVerify = jest.fn();
-  return {
-    Webhook: jest.fn().mockImplementation(() => ({
-      verify: mockVerify,
-    })),
-    __mockVerify: mockVerify,
-  };
-});
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { __mockVerify: mockSvixVerify } = require('svix') as {
-  __mockVerify: jest.Mock;
-};
+const mockSvixVerify = mock();
+mock.module('svix', () => ({
+  Webhook: class {
+    verify = mockSvixVerify;
+  },
+}));
 
 /**
  * Creates a mock Drizzle database client that supports method chaining.
@@ -26,19 +19,19 @@ const { __mockVerify: mockSvixVerify } = require('svix') as {
  * Intermediate operations (insert, update, select, values, set, from) return the mock for chaining.
  */
 function createMockDb() {
-  const mockDb: Record<string, jest.Mock> = {};
+  const mockDb: Record<string, ReturnType<typeof mock>> = {};
 
   // Terminal methods that resolve Promises
-  mockDb.where = jest.fn().mockResolvedValue([]);
-  mockDb.onConflictDoUpdate = jest.fn().mockResolvedValue(undefined);
+  mockDb.where = mock(() => Promise.resolve([]));
+  mockDb.onConflictDoUpdate = mock(() => Promise.resolve(undefined));
 
   // Intermediate chaining methods
-  mockDb.insert = jest.fn().mockReturnValue(mockDb);
-  mockDb.values = jest.fn().mockReturnValue(mockDb);
-  mockDb.update = jest.fn().mockReturnValue(mockDb);
-  mockDb.set = jest.fn().mockReturnValue(mockDb);
-  mockDb.select = jest.fn().mockReturnValue(mockDb);
-  mockDb.from = jest.fn().mockReturnValue(mockDb);
+  mockDb.insert = mock(() => mockDb);
+  mockDb.values = mock(() => mockDb);
+  mockDb.update = mock(() => mockDb);
+  mockDb.set = mock(() => mockDb);
+  mockDb.select = mock(() => mockDb);
+  mockDb.from = mock(() => mockDb);
 
   return mockDb;
 }
@@ -48,7 +41,7 @@ describe('WebhooksService', () => {
   let mockDb: ReturnType<typeof createMockDb>;
 
   const mockConfigService = {
-    get: jest.fn((key: string) => {
+    get: mock((key: string) => {
       const values: Record<string, string> = {
         CLERK_WEBHOOK_SIGNING_SECRET: 'whsec_test_secret',
       };
@@ -71,7 +64,7 @@ describe('WebhooksService', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    mockSvixVerify.mockClear();
   });
 
   it('should be defined', () => {

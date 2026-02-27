@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { AuthModule } from './auth/auth.module';
-import { HealthModule } from './health/health.module';
+import { AuthModule } from './core/auth/auth.module';
+import { HealthModule } from './core/health/health.module';
 import { DebugModule } from './debug/debug.module';
-import { DatabaseModule } from './database/database.module';
+import { DatabaseModule } from './core/database/database.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { BlueFolderModule } from './integrations/bluefolder/bluefolder.module';
+import { OrgModule } from './org/org.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     HealthModule,
     DebugModule,
     WebhooksModule,
+    OrgModule,
+    BlueFolderModule,
   ],
   controllers: [],
   providers: [],

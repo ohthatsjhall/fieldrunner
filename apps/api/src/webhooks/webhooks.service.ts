@@ -15,8 +15,8 @@ import type {
   OrganizationDomainJSON,
   OrganizationInvitationJSON,
 } from '@clerk/backend';
-import { DATABASE_CONNECTION } from '../database/database.module';
-import type { Database } from '../database';
+import { DATABASE_CONNECTION } from '../core/database/database.module';
+import type { Database } from '../core/database';
 import {
   webhookEvents,
   users,
@@ -25,7 +25,7 @@ import {
   organizationDomains,
   organizationInvitations,
   permissions,
-} from '../database/schema';
+} from '../core/database/schema';
 import { mapUserPayload } from './mappers/user.mapper';
 import { mapOrganizationPayload } from './mappers/organization.mapper';
 import { mapMembershipPayload } from './mappers/membership.mapper';

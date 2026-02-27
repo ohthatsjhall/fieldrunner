@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { CurrentUser, CurrentOrg } from '../auth/decorators';
+import { CurrentUser, CurrentOrg } from '../core/auth/decorators';
 import type { AuthUser, AuthOrganization } from '@fieldrunner/shared';
 
 @Controller('debug')

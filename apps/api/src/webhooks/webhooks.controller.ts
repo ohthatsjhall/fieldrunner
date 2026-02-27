@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
-import { Public } from '../auth/decorators';
+import { Public } from '../core/auth/decorators';
 import { WebhooksService } from './webhooks.service';
 
 @Controller('webhooks')

@@ -1,28 +1,26 @@
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ClerkService } from './clerk.service';
 import type { ClerkJwtPayload } from './interfaces/clerk-payload.interface';
 
-jest.mock('@clerk/backend', () => ({
-  verifyToken: jest.fn(),
+const mockVerifyToken = mock();
+mock.module('@clerk/backend', () => ({
+  verifyToken: mockVerifyToken,
 }));
-
-import { verifyToken } from '@clerk/backend';
-
-const mockVerifyToken = verifyToken as jest.MockedFunction<typeof verifyToken>;
 
 describe('ClerkService', () => {
   let service: ClerkService;
 
   const mockConfig = {
-    getOrThrow: jest.fn((key: string) => {
+    getOrThrow: mock((key: string) => {
       const vals: Record<string, string> = {
         CLERK_SECRET_KEY: 'sk_test_xxx',
         CLERK_PUBLISHABLE_KEY: 'pk_test_xxx',
       };
       return vals[key];
     }),
-    get: jest.fn().mockReturnValue(undefined),
+    get: mock(() => undefined),
   };
 
   beforeEach(async () => {
@@ -37,7 +35,7 @@ describe('ClerkService', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    mockVerifyToken.mockClear();
   });
 
   it('should be defined', () => {
@@ -56,9 +54,7 @@ describe('ClerkService', () => {
       org_role: 'org:admin',
     };
 
-    mockVerifyToken.mockResolvedValueOnce(
-      mockPayload as unknown as Awaited<ReturnType<typeof verifyToken>>,
-    );
+    mockVerifyToken.mockResolvedValueOnce(mockPayload);
 
     const result = await service.verifySessionToken('test-token');
 

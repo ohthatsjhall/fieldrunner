@@ -10,7 +10,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
-import * as schema from '../src/database/schema';
+import * as schema from '../src/core/database/schema';
 
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgresql://localhost:5432/fieldrunner';
