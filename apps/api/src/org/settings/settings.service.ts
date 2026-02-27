@@ -1,5 +1,5 @@
 import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
 import { organizations, organizationSettings } from '../../core/database/schema';
@@ -18,7 +18,12 @@ export class OrganizationSettingsService {
     const org = await this.db
       .select({ id: organizations.id })
       .from(organizations)
-      .where(eq(organizations.clerkId, clerkOrgId))
+      .where(
+        and(
+          eq(organizations.clerkId, clerkOrgId),
+          isNull(organizations.deletedAt),
+        ),
+      )
       .limit(1);
 
     if (org.length === 0) {

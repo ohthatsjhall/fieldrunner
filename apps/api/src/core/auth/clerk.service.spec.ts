@@ -1,26 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ClerkService } from './clerk.service';
+import { verifyToken } from '@clerk/backend';
 import type { ClerkJwtPayload } from './interfaces/clerk-payload.interface';
 
-const mockVerifyToken = mock();
-mock.module('@clerk/backend', () => ({
-  verifyToken: mockVerifyToken,
+jest.mock('@clerk/backend', () => ({
+  verifyToken: jest.fn(),
 }));
+
+const mockVerifyToken = verifyToken as jest.Mock;
 
 describe('ClerkService', () => {
   let service: ClerkService;
 
   const mockConfig = {
-    getOrThrow: mock((key: string) => {
+    getOrThrow: jest.fn((key: string) => {
       const vals: Record<string, string> = {
         CLERK_SECRET_KEY: 'sk_test_xxx',
         CLERK_PUBLISHABLE_KEY: 'pk_test_xxx',
       };
       return vals[key];
     }),
-    get: mock(() => undefined),
+    get: jest.fn(() => undefined),
   };
 
   beforeEach(async () => {

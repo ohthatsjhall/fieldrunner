@@ -8,6 +8,7 @@
 - Use `class-validator` decorators on DTOs for validation.
 - All services should used TDD before implementing proper business logic.
 - use context7 MCP for researching and finding the latest developer documentation.
+- The Clerk middleware file is `apps/frontend/proxy.ts` — **never rename it to `middleware.ts`**. This is the correct convention per Clerk docs.
 
 ## Architecture
 

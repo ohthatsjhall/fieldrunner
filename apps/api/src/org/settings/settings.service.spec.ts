@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { OrganizationSettingsService } from './settings.service';
@@ -11,18 +10,18 @@ const MOCK_CLERK_ORG_ID = 'org_clerk123';
 
 function createMockDb() {
   const chainable = {
-    from: mock(() => chainable),
-    where: mock(() => chainable),
-    limit: mock(() => Promise.resolve([])),
-    set: mock(() => chainable),
-    values: mock(() => Promise.resolve([])),
+    from: jest.fn(() => chainable),
+    where: jest.fn(() => chainable),
+    limit: jest.fn(() => Promise.resolve([])),
+    set: jest.fn(() => chainable),
+    values: jest.fn(() => Promise.resolve([])),
   };
 
   return {
-    select: mock(() => chainable),
-    insert: mock(() => chainable),
-    update: mock(() => chainable),
-    delete: mock(() => chainable),
+    select: jest.fn(() => chainable),
+    insert: jest.fn(() => chainable),
+    update: jest.fn(() => chainable),
+    delete: jest.fn(() => chainable),
     _chainable: chainable,
   };
 }
@@ -30,15 +29,15 @@ function createMockDb() {
 describe('OrganizationSettingsService', () => {
   let service: OrganizationSettingsService;
   let mockDb: ReturnType<typeof createMockDb>;
-  let mockEncrypt: ReturnType<typeof spyOn>;
-  let mockDecrypt: ReturnType<typeof spyOn>;
+  let mockEncrypt: jest.SpyInstance;
+  let mockDecrypt: jest.SpyInstance;
 
   beforeEach(async () => {
     process.env.ENCRYPTION_KEY = randomBytes(32).toString('hex');
     mockDb = createMockDb();
 
-    mockEncrypt = spyOn(cryptoUtil, 'encrypt');
-    mockDecrypt = spyOn(cryptoUtil, 'decrypt');
+    mockEncrypt = jest.spyOn(cryptoUtil, 'encrypt');
+    mockDecrypt = jest.spyOn(cryptoUtil, 'decrypt');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

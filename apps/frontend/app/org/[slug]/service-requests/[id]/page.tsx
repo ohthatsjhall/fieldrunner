@@ -350,6 +350,11 @@ function FilesTab({
   );
 }
 
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
   if (sr.log.length === 0) {
     return <p className="py-4 text-sm text-zinc-500">No history entries.</p>;
@@ -359,9 +364,9 @@ function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
     <div className="space-y-3">
       {sr.log.map((entry) => (
         <div key={entry.id} className="border-l-2 border-zinc-200 py-1 pl-4 dark:border-zinc-700">
-          <p className="text-sm text-zinc-900 dark:text-zinc-100">{entry.description}</p>
+          <p className="text-sm text-zinc-900 dark:text-zinc-100">{stripHtml(entry.description)}</p>
           {entry.comment && (
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{entry.comment}</p>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{stripHtml(entry.comment)}</p>
           )}
           <p className="mt-1 text-xs text-zinc-400">
             {entry.createdByUserName && <span className="font-medium">{entry.createdByUserName} &middot; </span>}

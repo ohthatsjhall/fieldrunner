@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import { useApiClient } from '@/lib/api-client-browser';
 import type { ServiceRequest } from '@fieldrunner/shared';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Stats {
   total: number;
@@ -135,8 +134,9 @@ function ServiceRequestTable({
 }
 
 export function OrgDashboardContent({ slug }: { slug: string }) {
-  const { getToken, orgId } = useAuth();
+  const { orgId } = useAuth();
   const orgReady = !!orgId;
+  const { apiFetch } = useApiClient();
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
@@ -159,39 +159,24 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
     return serviceRequests.filter((sr) => sr.status === statusFilter);
   }, [serviceRequests, statusFilter]);
 
-  const getHeaders = useCallback(async () => {
-    const token = await getToken({ skipCache: true });
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
-  }, [getToken]);
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const headers = await getHeaders();
-
-      const [statsRes, srRes, syncStatusRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/bluefolder/stats`, { headers }),
-        fetch(`${API_BASE_URL}/bluefolder/service-requests`, { headers }),
-        fetch(`${API_BASE_URL}/bluefolder/sync-status`, { headers }),
+      const [statsData, srData] = await Promise.all([
+        apiFetch<Stats>('/bluefolder/stats'),
+        apiFetch<ServiceRequest[]>('/bluefolder/service-requests'),
       ]);
 
-      if (!statsRes.ok || !srRes.ok) {
-        throw new Error(`API error: ${statsRes.status} / ${srRes.status}`);
-      }
+      setStats(statsData);
+      setServiceRequests(srData);
 
-      setStats(await statsRes.json());
-      setServiceRequests(await srRes.json());
-
-      if (syncStatusRes.ok) {
-        const syncData = await syncStatusRes.json();
+      // Sync status is non-critical — don't fail the whole load if it errors
+      try {
+        const syncData = await apiFetch<{ lastSyncedAt: string | null }>('/bluefolder/sync-status');
         setLastSyncedAt(syncData.lastSyncedAt ?? null);
+      } catch {
+        // ignore sync-status failures
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
@@ -199,20 +184,13 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
     } finally {
       setLoading(false);
     }
-  }, [getHeaders]);
+  }, [apiFetch]);
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
     setError(null);
     try {
-      const headers = await getHeaders();
-      const res = await fetch(`${API_BASE_URL}/bluefolder/sync`, {
-        method: 'POST',
-        headers,
-      });
-      if (!res.ok) {
-        throw new Error(`Sync failed: ${res.status}`);
-      }
+      await apiFetch<void>('/bluefolder/sync', { method: 'POST' });
       await fetchData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sync failed';
@@ -220,7 +198,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
     } finally {
       setSyncing(false);
     }
-  }, [getHeaders, fetchData]);
+  }, [apiFetch, fetchData]);
 
   useEffect(() => {
     if (!orgReady) return;

@@ -163,12 +163,6 @@ export class WebhooksService {
         await this.handleDomainEvent(event);
         break;
 
-      case 'role.created':
-      case 'role.updated':
-      case 'role.deleted':
-        this.handleRoleEvent(event);
-        break;
-
       case 'permission.created':
       case 'permission.updated':
       case 'permission.deleted':
@@ -535,15 +529,6 @@ export class WebhooksService {
         target: organizationInvitations.clerkId,
         set: omit(values, 'clerkId'),
       });
-  }
-
-  // ─── Entity Handler (stub — Phase 3) ───────────────────────────
-
-  private handleRoleEvent(event: WebhookEvent): void {
-    this.logger.log('Role event handler not yet implemented', {
-      eventType: event.type,
-      clerkId: (event.data as unknown as Record<string, unknown>).id,
-    });
   }
 
   /**

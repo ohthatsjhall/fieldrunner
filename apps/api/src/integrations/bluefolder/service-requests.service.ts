@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { eq, desc, sql, isNotNull } from 'drizzle-orm';
+import { eq, desc, sql, isNotNull, and, isNull } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
 import {
@@ -159,7 +159,12 @@ export class ServiceRequestsService {
         organizationSettings,
         eq(organizations.id, organizationSettings.organizationId),
       )
-      .where(isNotNull(organizationSettings.bluefolderApiKey));
+      .where(
+        and(
+          isNotNull(organizationSettings.bluefolderApiKey),
+          isNull(organizations.deletedAt),
+        ),
+      );
 
     if (orgs.length === 0) {
       this.logger.debug('No orgs with BlueFolder API keys — skipping sync');

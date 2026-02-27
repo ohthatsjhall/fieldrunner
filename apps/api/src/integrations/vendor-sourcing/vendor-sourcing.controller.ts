@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   NotFoundException,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
 import { VendorSourcingService } from './vendor-sourcing.service';
@@ -14,6 +15,8 @@ import { TradeCategoriesService } from './trade-categories/trade-categories.serv
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
 
+@ApiTags('Vendor Sourcing')
+@ApiBearerAuth()
 @Controller('vendor-sourcing')
 export class VendorSourcingController {
   constructor(
@@ -23,6 +26,8 @@ export class VendorSourcingController {
   ) {}
 
   @Post('search')
+  @ApiOperation({ summary: 'Search for vendors by trade and location' })
+  @ApiResponse({ status: 201, description: 'Search results with scored vendors' })
   search(
     @CurrentOrg() org: AuthOrganization,
     @Body() dto: SearchVendorsDto,
@@ -31,12 +36,17 @@ export class VendorSourcingController {
   }
 
   @Get('sessions')
+  @ApiOperation({ summary: 'List all vendor search sessions' })
+  @ApiResponse({ status: 200, description: 'List of search sessions' })
   async listSessions(@CurrentOrg() org: AuthOrganization) {
     const organizationId = await this.settingsService.resolveOrgId(org.orgId);
     return this.vendorSourcingService.listSessions(organizationId);
   }
 
   @Get('sessions/:id')
+  @ApiOperation({ summary: 'Get a vendor search session by ID' })
+  @ApiResponse({ status: 200, description: 'Search session detail' })
+  @ApiResponse({ status: 404, description: 'Session not found' })
   async getSession(
     @CurrentOrg() org: AuthOrganization,
     @Param('id', ParseUUIDPipe) id: string,
@@ -48,6 +58,9 @@ export class VendorSourcingController {
   }
 
   @Get('vendors/:id')
+  @ApiOperation({ summary: 'Get detailed info for a specific vendor' })
+  @ApiResponse({ status: 200, description: 'Vendor detail' })
+  @ApiResponse({ status: 404, description: 'Vendor not found' })
   async getVendorDetail(
     @CurrentOrg() org: AuthOrganization,
     @Param('id', ParseUUIDPipe) id: string,
@@ -59,12 +72,16 @@ export class VendorSourcingController {
   }
 
   @Get('trade-categories')
+  @ApiOperation({ summary: 'List trade categories for the organization' })
+  @ApiResponse({ status: 200, description: 'List of trade categories' })
   async listTradeCategories(@CurrentOrg() org: AuthOrganization) {
     const organizationId = await this.settingsService.resolveOrgId(org.orgId);
     return this.tradeCategoriesService.findAll(organizationId);
   }
 
   @Post('trade-categories')
+  @ApiOperation({ summary: 'Seed default trade categories for the organization' })
+  @ApiResponse({ status: 201, description: 'Trade categories seeded and returned' })
   async createTradeCategory(@CurrentOrg() org: AuthOrganization) {
     const organizationId = await this.settingsService.resolveOrgId(org.orgId);
     // Seed defaults first (idempotent)

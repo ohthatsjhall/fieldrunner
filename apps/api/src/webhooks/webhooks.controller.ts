@@ -7,11 +7,13 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { Public } from '../core/auth/decorators';
 import { WebhooksService } from './webhooks.service';
 
+@ApiTags('Webhooks')
 @Controller('webhooks')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
@@ -21,6 +23,9 @@ export class WebhooksController {
   @Post()
   @Public()
   @HttpCode(200)
+  @ApiOperation({ summary: 'Receive and process Clerk webhook events' })
+  @ApiResponse({ status: 200, description: 'Webhook processed or duplicate detected' })
+  @ApiResponse({ status: 400, description: 'Invalid signature or missing headers' })
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers() headers: Record<string, string>,

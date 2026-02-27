@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
@@ -6,8 +5,8 @@ import { WebhooksService } from './webhooks.service';
 import { DATABASE_CONNECTION } from '../core/database/database.module';
 import type { WebhookEvent } from '@clerk/backend';
 
-const mockSvixVerify = mock();
-mock.module('svix', () => ({
+const mockSvixVerify = jest.fn();
+jest.mock('svix', () => ({
   Webhook: class {
     verify = mockSvixVerify;
   },
@@ -19,19 +18,19 @@ mock.module('svix', () => ({
  * Intermediate operations (insert, update, select, values, set, from) return the mock for chaining.
  */
 function createMockDb() {
-  const mockDb: Record<string, ReturnType<typeof mock>> = {};
+  const mockDb: Record<string, jest.Mock> = {};
 
   // Terminal methods that resolve Promises
-  mockDb.where = mock(() => Promise.resolve([]));
-  mockDb.onConflictDoUpdate = mock(() => Promise.resolve(undefined));
+  mockDb.where = jest.fn(() => Promise.resolve([]));
+  mockDb.onConflictDoUpdate = jest.fn(() => Promise.resolve(undefined));
 
   // Intermediate chaining methods
-  mockDb.insert = mock(() => mockDb);
-  mockDb.values = mock(() => mockDb);
-  mockDb.update = mock(() => mockDb);
-  mockDb.set = mock(() => mockDb);
-  mockDb.select = mock(() => mockDb);
-  mockDb.from = mock(() => mockDb);
+  mockDb.insert = jest.fn(() => mockDb);
+  mockDb.values = jest.fn(() => mockDb);
+  mockDb.update = jest.fn(() => mockDb);
+  mockDb.set = jest.fn(() => mockDb);
+  mockDb.select = jest.fn(() => mockDb);
+  mockDb.from = jest.fn(() => mockDb);
 
   return mockDb;
 }
@@ -41,7 +40,7 @@ describe('WebhooksService', () => {
   let mockDb: ReturnType<typeof createMockDb>;
 
   const mockConfigService = {
-    get: mock((key: string) => {
+    get: jest.fn((key: string) => {
       const values: Record<string, string> = {
         CLERK_WEBHOOK_SIGNING_SECRET: 'whsec_test_secret',
       };
@@ -682,17 +681,6 @@ describe('WebhooksService', () => {
       await expect(service.processEvent(event)).rejects.toThrow(
         'Referenced entity not found',
       );
-    });
-
-    // ─── Role handler (stub) ────────────────────────────────────────
-
-    it('should handle role events without throwing (stub handler)', async () => {
-      const event = {
-        type: 'role.created',
-        data: { id: 'role_123' },
-      } as unknown as WebhookEvent;
-
-      await expect(service.processEvent(event)).resolves.toBeUndefined();
     });
 
     it('should throw when membership FK lookup fails (org not found)', async () => {

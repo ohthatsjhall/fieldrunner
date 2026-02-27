@@ -10,11 +10,13 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { BlueFolderModule } from './integrations/bluefolder/bluefolder.module';
 import { VendorSourcingModule } from './integrations/vendor-sourcing/vendor-sourcing.module';
 import { OrgModule } from './org/org.module';
+import { validate } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate,
     }),
     LoggerModule.forRootAsync({
       inject: [ConfigService],
