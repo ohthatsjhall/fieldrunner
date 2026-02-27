@@ -141,6 +141,47 @@ describe('ClerkAuthGuard', () => {
     });
   });
 
+  it('should read org claims from v2 compact format', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+
+    const mockPayload: ClerkJwtPayload = {
+      sub: 'user_123',
+      sid: 'sess_456',
+      iss: 'https://test.clerk.accounts.dev',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iat: Math.floor(Date.now() / 1000),
+      o: {
+        id: 'org_v2_789',
+        slg: 'v2-org',
+        rol: 'org:admin',
+      },
+    };
+
+    clerkService.verifySessionToken.mockResolvedValue(mockPayload);
+
+    const mockRequest: Record<string, unknown> = {
+      headers: { authorization: 'Bearer valid-token' },
+    };
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => mockRequest,
+      }),
+      getHandler: () => jest.fn(),
+      getClass: () => jest.fn(),
+    } as unknown as ExecutionContext;
+
+    const result = await guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(mockRequest['auth']).toEqual({
+      userId: 'user_123',
+      sessionId: 'sess_456',
+      orgId: 'org_v2_789',
+      orgSlug: 'v2-org',
+      orgRole: 'org:admin',
+    });
+  });
+
   it('should throw UnauthorizedException when token verification fails', async () => {
     reflector.getAllAndOverride.mockReturnValue(false);
     clerkService.verifySessionToken.mockRejectedValue(

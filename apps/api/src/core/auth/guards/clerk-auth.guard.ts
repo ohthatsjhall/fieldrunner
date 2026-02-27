@@ -39,13 +39,21 @@ export class ClerkAuthGuard implements CanActivate {
     try {
       const payload = await this.clerkService.verifySessionToken(token);
 
+      const orgId = payload.org_id ?? payload.o?.id;
+      const orgSlug = payload.org_slug ?? payload.o?.slg;
+      const orgRole = payload.org_role ?? payload.o?.rol;
+
       request.auth = {
         userId: payload.sub,
         sessionId: payload.sid,
-        orgId: payload.org_id,
-        orgSlug: payload.org_slug,
-        orgRole: payload.org_role,
+        orgId,
+        orgSlug,
+        orgRole,
       };
+
+      this.logger.debug(
+        `Auth resolved | user=${payload.sub} org=${orgId ?? 'MISSING'} slug=${orgSlug ?? 'MISSING'}`,
+      );
 
       return true;
     } catch (error) {
