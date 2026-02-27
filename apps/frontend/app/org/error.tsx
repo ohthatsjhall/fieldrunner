@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-
 export default function OrgError({
   error,
   reset,
@@ -9,23 +7,16 @@ export default function OrgError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error('[OrgError]', error);
-
-    // Auto-reload after a brief delay — handles transient Clerk SDK
-    // initialization errors that occur during the SSO → /org transition.
-    const timer = setTimeout(() => {
-      window.location.reload();
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [error]);
-
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="flex items-center gap-2 text-zinc-500">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
-        Setting up your workspace...
+      <div className="text-center space-y-4">
+        <p className="text-zinc-500">{error.message || 'Something went wrong'}</p>
+        <button
+          onClick={reset}
+          className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          Try again
+        </button>
       </div>
     </div>
   );
