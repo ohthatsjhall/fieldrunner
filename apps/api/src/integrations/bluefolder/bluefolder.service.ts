@@ -1,15 +1,17 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { BlueFolderClientService } from './bluefolder-client.service';
+import { BlueFolderClientService, BlueFolderApiError } from './bluefolder-client.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
-import { mapServiceRequestListItem, mapServiceRequestDetail } from './mappers';
+import { mapServiceRequestListItem, mapServiceRequestDetail, mapServiceRequestFile } from './mappers';
 import type {
   BfServiceRequestListResponse,
   BfServiceRequestGetResponse,
+  BfServiceRequestFilesResponse,
   BfServiceRequestListFilter,
 } from './types/bluefolder-api.types';
 import type {
   ServiceRequestSummary,
   ServiceRequestDetail,
+  ServiceRequestFile,
 } from '@fieldrunner/shared';
 
 @Injectable()
@@ -64,4 +66,32 @@ export class BlueFolderService {
     return mapServiceRequestDetail(sr);
   }
 
+  async getServiceRequestFiles(
+    clerkOrgId: string,
+    serviceRequestId: number,
+  ): Promise<ServiceRequestFile[]> {
+    const apiKey = await this.getApiKey(clerkOrgId);
+
+    try {
+      const result = await this.client.request<BfServiceRequestFilesResponse>(
+        'serviceRequests/getFiles.aspx',
+        apiKey,
+        { serviceRequestId: String(serviceRequestId) },
+      );
+
+      const files = result.serviceRequestFile ?? [];
+      return (Array.isArray(files) ? files : [files]).map(
+        mapServiceRequestFile,
+      );
+    } catch (error) {
+      // BlueFolder returns an error (often 404) when no files exist
+      if (
+        error instanceof BlueFolderApiError &&
+        (error.statusCode === 404 || error.code === '404')
+      ) {
+        return [];
+      }
+      throw error;
+    }
+  }
 }

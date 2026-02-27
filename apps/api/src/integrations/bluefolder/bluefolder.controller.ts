@@ -35,6 +35,14 @@ export class BlueFolderController {
     return this.blueFolderService.getServiceRequest(org.orgId, id);
   }
 
+  @Get('service-requests/:id/files')
+  getServiceRequestFiles(
+    @CurrentOrg() org: AuthOrganization,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.blueFolderService.getServiceRequestFiles(org.orgId, id);
+  }
+
   @Get('stats')
   getStats(@CurrentOrg() org: AuthOrganization) {
     return this.serviceRequestsService.getStats(org.orgId);
