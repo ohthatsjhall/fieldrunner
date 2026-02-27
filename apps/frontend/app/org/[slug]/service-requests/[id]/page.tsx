@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useApiClient } from '@/lib/api-client-browser';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
 
-type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'history';
+type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'equipment' | 'history';
 
 function TabButton({
   active,
@@ -211,6 +211,36 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
   );
 }
 
+function EquipmentTab({ sr }: { sr: ServiceRequestDetail }) {
+  if (sr.equipment.length === 0) {
+    return <p className="py-4 text-sm text-zinc-500">No equipment.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {sr.equipment.map((e) => (
+        <div key={e.equipmentId} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{e.equipName || 'Unnamed Equipment'}</span>
+            {e.equipType && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                {e.equipType}
+              </span>
+            )}
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {e.mfrName && <FieldRow label="Manufacturer" value={e.mfrName} />}
+            {e.modelNo && <FieldRow label="Model" value={e.modelNo} />}
+            {e.serialNo && <FieldRow label="Serial #" value={e.serialNo} />}
+            {e.refNo && <FieldRow label="Ref #" value={e.refNo} />}
+            {e.nextServiceDate && <FieldRow label="Next Service" value={new Date(e.nextServiceDate).toLocaleDateString()} />}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
   if (sr.log.length === 0) {
     return <p className="py-4 text-sm text-zinc-500">No history entries.</p>;
@@ -247,22 +277,20 @@ export default function ServiceRequestDetailPage() {
   useEffect(() => {
     if (!isLoaded || !params.id) return;
 
-    // TODO: Re-enable once BlueFolder API key is configured
-    // async function fetchDetail() {
-    //   setLoading(true);
-    //   try {
-    //     const data = await apiFetch<ServiceRequestDetail>(
-    //       `/bluefolder/service-requests/${params.id}`,
-    //     );
-    //     setSr(data);
-    //   } catch (err) {
-    //     setError(err instanceof Error ? err.message : 'Failed to load service request');
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // }
-    // fetchDetail();
-    setLoading(false);
+    async function fetchDetail() {
+      setLoading(true);
+      try {
+        const data = await apiFetch<ServiceRequestDetail>(
+          `/bluefolder/service-requests/${params.id}`,
+        );
+        setSr(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load service request');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDetail();
   }, [isLoaded, params.id, apiFetch]);
 
   if (loading) {
@@ -297,6 +325,7 @@ export default function ServiceRequestDetailPage() {
     { key: 'labor', label: 'Labor', count: sr.labor.length },
     { key: 'materials', label: 'Materials', count: sr.materials.length },
     { key: 'expenses', label: 'Expenses', count: sr.expenses.length },
+    { key: 'equipment', label: 'Equipment', count: sr.equipment.length },
     { key: 'history', label: 'History', count: sr.log.length },
   ];
 
@@ -328,7 +357,7 @@ export default function ServiceRequestDetailPage() {
         </div>
         <p className="mt-1 text-zinc-600 dark:text-zinc-400">{sr.description}</p>
         {sr.detailedDescription && (
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{sr.detailedDescription}</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-zinc-500 dark:text-zinc-400">{sr.detailedDescription}</p>
         )}
       </div>
 
@@ -352,6 +381,7 @@ export default function ServiceRequestDetailPage() {
         {activeTab === 'labor' && <LaborTab sr={sr} />}
         {activeTab === 'materials' && <MaterialsTab sr={sr} />}
         {activeTab === 'expenses' && <ExpensesTab sr={sr} />}
+        {activeTab === 'equipment' && <EquipmentTab sr={sr} />}
         {activeTab === 'history' && <HistoryTab sr={sr} />}
       </div>
     </div>
