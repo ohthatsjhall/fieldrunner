@@ -24,7 +24,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider taskUrls={{ 'choose-organization': '/choose-org' }}>
+    <ClerkProvider
+      taskUrls={{ 'choose-organization': '/choose-org' }}
+      appearance={{
+        elements: {
+          formFieldRow__slug: { display: 'none' },
+        },
+      }}
+    >
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}

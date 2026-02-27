@@ -22,6 +22,7 @@ export default async function OrgLayout({
       <div className="flex min-h-screen items-center justify-center">
         <OrganizationList
           hidePersonal
+          hideSlug
           afterSelectOrganizationUrl="/org/:slug"
           afterCreateOrganizationUrl="/org/:slug"
         />
