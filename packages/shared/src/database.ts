@@ -124,3 +124,25 @@ export type OrganizationSettings = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type ServiceRequest = {
+  id: string;
+  organizationId: string;
+  bluefolderId: number;
+  description: string;
+  status: string;
+  priority: string;
+  priorityLabel: string;
+  type: string;
+  customerName: string;
+  customerId: number | null;
+  isOpen: boolean;
+  isOverdue: boolean;
+  billableTotal: string | null;
+  costTotal: string | null;
+  dateTimeCreated: Date | null;
+  dateTimeClosed: Date | null;
+  syncedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};

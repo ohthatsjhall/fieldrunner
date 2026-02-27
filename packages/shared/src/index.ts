@@ -9,6 +9,7 @@ export type {
   Permission,
   RolePermission,
   OrganizationSettings,
+  ServiceRequest,
 } from './database.js';
 export type {
   ServiceRequestSummary,
