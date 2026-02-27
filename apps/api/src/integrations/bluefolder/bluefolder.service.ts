@@ -57,7 +57,11 @@ export class BlueFolderService {
       { serviceRequestId: String(serviceRequestId) },
     );
 
-    return mapServiceRequestDetail(result.serviceRequest);
+    // serviceRequest is forced to array by isArray parser config
+    const sr = Array.isArray(result.serviceRequest)
+      ? result.serviceRequest[0]
+      : result.serviceRequest;
+    return mapServiceRequestDetail(sr);
   }
 
 }

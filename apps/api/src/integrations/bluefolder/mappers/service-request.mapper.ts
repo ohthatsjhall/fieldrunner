@@ -36,6 +36,14 @@ function toDateOrNull(value: string | undefined | null): string | null {
   return value;
 }
 
+function decodeXmlText(value: string | undefined | null): string {
+  if (!value) return '';
+  return value
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/\r\n?/g, '\n');
+}
+
 function ensureArray<T>(value: T[] | T | undefined | null): T[] {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
@@ -58,8 +66,8 @@ export function mapServiceRequestListItem(
 
   return {
     serviceRequestId: toNumber(item.serviceRequestId),
-    description: item.description ?? '',
-    detailedDescription: item.detailedDescription ?? '',
+    description: decodeXmlText(item.description),
+    detailedDescription: decodeXmlText(item.detailedDescription),
     status,
     priority: item.priority ?? '',
     priorityLabel: item.priorityLabel ?? item.priority ?? '',
@@ -104,8 +112,8 @@ export function mapServiceRequestDetail(
 
   return {
     serviceRequestId: toNumber(sr.serviceRequestId),
-    description: sr.description ?? '',
-    detailedDescription: sr.detailedDescription ?? '',
+    description: decodeXmlText(sr.description),
+    detailedDescription: decodeXmlText(sr.detailedDescription),
     status,
     priority: sr.priority ?? '',
     priorityLabel: sr.priority ?? '',
@@ -160,7 +168,7 @@ export function mapServiceRequestDetail(
     assignments: ensureArray(sr.assignments?.assignment).map(
       (a): ServiceRequestAssignment => ({
         assignmentId: toNumber(a.assignmentId),
-        assigneeUserIds: (a.assigneeUserIds ?? '')
+        assigneeUserIds: String(a.assigneeUserIds ?? '')
           .split(',')
           .map((id) => id.trim())
           .filter(Boolean)

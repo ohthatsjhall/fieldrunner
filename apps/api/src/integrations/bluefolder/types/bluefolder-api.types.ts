@@ -620,9 +620,11 @@ export interface BfServiceRequestListResponse {
   };
 }
 
-/** Envelope for the single-get response. */
+/** Envelope for the single-get response.
+ * Note: serviceRequest is forced to array by isArray parser config
+ * (BLUEFOLDER_ARRAY_TAGS includes 'serviceRequest' for the list endpoint). */
 export interface BfServiceRequestGetResponse {
-  serviceRequest: BfServiceRequest;
+  serviceRequest: BfServiceRequest[];
 }
 
 // ---------------------------------------------------------------------------
