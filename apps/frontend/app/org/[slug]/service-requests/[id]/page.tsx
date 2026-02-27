@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useApiClient } from '@/lib/api-client-browser';
-import type { ServiceRequestDetail } from '@fieldrunner/shared';
+import type { ServiceRequestDetail, ServiceRequestFile } from '@fieldrunner/shared';
 
-type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'equipment' | 'history';
+type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'equipment' | 'files' | 'history';
 
 function TabButton({
   active,
@@ -241,6 +241,103 @@ function EquipmentTab({ sr }: { sr: ServiceRequestDetail }) {
   );
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function FilesTab({
+  files,
+  loading,
+  error,
+}: {
+  files: ServiceRequestFile[];
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="py-4 text-sm text-red-600">{error}</p>;
+  }
+
+  if (files.length === 0) {
+    return <p className="py-4 text-sm text-zinc-500">No files or attachments.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {files.map((f) => {
+        const key = f.serviceRequestFileId || f.serviceRequestSignedDocumentId || f.fileName;
+        const isLink = f.isExternalLink;
+        const isSigned = f.isSignedDocument;
+
+        return (
+          <div key={key} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {f.linkUrl ? (
+                    <a href={f.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                      {f.fileName || f.fileDescription || f.documentName || 'Download'}
+                    </a>
+                  ) : (
+                    f.fileName || f.documentName || f.fileDescription || 'Untitled'
+                  )}
+                </span>
+                {isSigned && (
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    Signed Document
+                  </span>
+                )}
+                {isLink && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    Link
+                  </span>
+                )}
+                {f.isPrivate && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    Private
+                  </span>
+                )}
+              </div>
+              {f.fileSize > 0 && (
+                <span className="text-xs text-zinc-500">{formatFileSize(f.fileSize)}</span>
+              )}
+            </div>
+            {f.fileDescription && f.fileDescription !== f.fileName && (
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{f.fileDescription}</p>
+            )}
+            <div className="mt-2 flex gap-4 text-xs text-zinc-500">
+              {f.postedBy && <span>By: {f.postedBy}</span>}
+              {f.postedOn && <span>{new Date(f.postedOn).toLocaleString()}</span>}
+              {f.fileType && f.fileType !== 'external' && f.fileType !== 'signedDocument' && (
+                <span>{f.fileType}</span>
+              )}
+            </div>
+            {isSigned && (f.signatureNameCustomer || f.signatureNameTechnician) && (
+              <div className="mt-2 flex gap-4 text-xs text-zinc-500">
+                {f.signatureNameCustomer && <span>Customer: {f.signatureNameCustomer}</span>}
+                {f.signatureNameTechnician && <span>Technician: {f.signatureNameTechnician}</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
   if (sr.log.length === 0) {
     return <p className="py-4 text-sm text-zinc-500">No history entries.</p>;
@@ -273,6 +370,10 @@ export default function ServiceRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [files, setFiles] = useState<ServiceRequestFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [filesFetched, setFilesFetched] = useState(false);
 
   useEffect(() => {
     if (!isLoaded || !params.id) return;
@@ -292,6 +393,26 @@ export default function ServiceRequestDetailPage() {
     }
     fetchDetail();
   }, [isLoaded, params.id, apiFetch]);
+
+  const fetchFiles = useCallback(async () => {
+    if (filesFetched || filesLoading || !params.id) return;
+    setFilesLoading(true);
+    try {
+      const data = await apiFetch<ServiceRequestFile[]>(
+        `/bluefolder/service-requests/${params.id}/files`,
+      );
+      setFiles(data);
+    } catch (err) {
+      setFilesError(err instanceof Error ? err.message : 'Failed to load files');
+    } finally {
+      setFilesLoading(false);
+      setFilesFetched(true);
+    }
+  }, [filesFetched, filesLoading, params.id, apiFetch]);
+
+  useEffect(() => {
+    if (activeTab === 'files') fetchFiles();
+  }, [activeTab, fetchFiles]);
 
   if (loading) {
     return (
@@ -326,6 +447,7 @@ export default function ServiceRequestDetailPage() {
     { key: 'materials', label: 'Materials', count: sr.materials.length },
     { key: 'expenses', label: 'Expenses', count: sr.expenses.length },
     { key: 'equipment', label: 'Equipment', count: sr.equipment.length },
+    { key: 'files', label: 'Files', count: filesFetched ? files.length : undefined },
     { key: 'history', label: 'History', count: sr.log.length },
   ];
 
@@ -382,6 +504,7 @@ export default function ServiceRequestDetailPage() {
         {activeTab === 'materials' && <MaterialsTab sr={sr} />}
         {activeTab === 'expenses' && <ExpensesTab sr={sr} />}
         {activeTab === 'equipment' && <EquipmentTab sr={sr} />}
+        {activeTab === 'files' && <FilesTab files={files} loading={filesLoading} error={filesError} />}
         {activeTab === 'history' && <HistoryTab sr={sr} />}
       </div>
     </div>
