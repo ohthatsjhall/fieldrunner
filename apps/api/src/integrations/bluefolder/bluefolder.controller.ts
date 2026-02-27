@@ -1,19 +1,30 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
 import { BlueFolderService } from './bluefolder.service';
-import { ListServiceRequestsDto } from './dto';
+import { ServiceRequestsService } from './service-requests.service';
 
 @Controller('bluefolder')
 export class BlueFolderController {
-  constructor(private readonly blueFolderService: BlueFolderService) {}
+  constructor(
+    private readonly blueFolderService: BlueFolderService,
+    private readonly serviceRequestsService: ServiceRequestsService,
+  ) {}
+
+  @Post('sync')
+  sync(@CurrentOrg() org: AuthOrganization) {
+    return this.serviceRequestsService.sync(org.orgId);
+  }
 
   @Get('service-requests')
-  listServiceRequests(
-    @CurrentOrg() org: AuthOrganization,
-    @Query() filters: ListServiceRequestsDto,
-  ) {
-    return this.blueFolderService.listServiceRequests(org.orgId, filters);
+  listServiceRequests(@CurrentOrg() org: AuthOrganization) {
+    return this.serviceRequestsService.findAll(org.orgId);
   }
 
   @Get('service-requests/:id')
@@ -26,6 +37,14 @@ export class BlueFolderController {
 
   @Get('stats')
   getStats(@CurrentOrg() org: AuthOrganization) {
-    return this.blueFolderService.getStats(org.orgId);
+    return this.serviceRequestsService.getStats(org.orgId);
+  }
+
+  @Get('sync-status')
+  async getSyncStatus(@CurrentOrg() org: AuthOrganization) {
+    const lastSyncedAt = await this.serviceRequestsService.getLastSyncedAt(
+      org.orgId,
+    );
+    return { lastSyncedAt };
   }
 }

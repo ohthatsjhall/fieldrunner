@@ -12,13 +12,6 @@ import type {
   ServiceRequestDetail,
 } from '@fieldrunner/shared';
 
-export interface ServiceRequestStats {
-  total: number;
-  open: number;
-  closed: number;
-  overdue: number;
-}
-
 @Injectable()
 export class BlueFolderService {
   constructor(
@@ -67,14 +60,4 @@ export class BlueFolderService {
     return mapServiceRequestDetail(result.serviceRequest);
   }
 
-  async getStats(clerkOrgId: string): Promise<ServiceRequestStats> {
-    const items = await this.listServiceRequests(clerkOrgId);
-
-    return {
-      total: items.length,
-      open: items.filter((sr) => sr.isOpen).length,
-      closed: items.filter((sr) => !sr.isOpen).length,
-      overdue: items.filter((sr) => sr.isOverdue).length,
-    };
-  }
 }

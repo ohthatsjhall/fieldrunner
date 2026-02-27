@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './core/auth/auth.module';
 import { HealthModule } from './core/health/health.module';
@@ -28,9 +29,25 @@ import { OrgModule } from './org/org.module';
                   target: 'pino-pretty',
                   options: {
                     colorize: true,
-                    singleLine: true,
+                    singleLine: false,
+                    translateTime: 'HH:MM:ss.l',
+                    ignore: 'pid,hostname',
+                    messageFormat:
+                      '{context} | {msg} {req.method} {req.url} {res.statusCode}',
                   },
                 },
+            serializers: {
+              req: (req) => ({
+                method: req.method,
+                url: req.url,
+                query: Object.keys(req.query ?? {}).length
+                  ? req.query
+                  : undefined,
+              }),
+              res: (res) => ({
+                statusCode: res.statusCode,
+              }),
+            },
             redact: {
               paths: [
                 'req.headers.authorization',
@@ -43,6 +60,7 @@ import { OrgModule } from './org/org.module';
         };
       },
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AuthModule,
     HealthModule,

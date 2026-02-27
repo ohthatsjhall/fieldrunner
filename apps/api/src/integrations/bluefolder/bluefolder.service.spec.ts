@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderClientService } from './bluefolder-client.service';
-import { OrganizationSettingsService } from '../../organization-settings/organization-settings.service';
+import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import type { BfServiceRequestListItem } from './types/bluefolder-api.types';
 
 function makeBfListItem(
@@ -335,38 +335,6 @@ describe('BlueFolderService', () => {
         'api-key',
         { serviceRequestId: '42' },
       );
-    });
-  });
-
-  describe('getStats', () => {
-    it('should compute stats from the list', async () => {
-      mockSettings.getDecryptedApiKey.mockResolvedValue('api-key');
-      mockClient.request.mockResolvedValue({
-        serviceRequestList: {
-          serviceRequest: [
-            makeBfListItem({ status: 'New', dueDate: '2020-01-01T00:00:00' }),
-            makeBfListItem({ status: 'In Progress', dueDate: '' }),
-            makeBfListItem({ status: 'Closed', dueDate: '' }),
-          ],
-        },
-      });
-
-      const stats = await service.getStats(clerkOrgId);
-
-      expect(stats.total).toBe(3);
-      expect(stats.open).toBe(2);
-      expect(stats.closed).toBe(1);
-      expect(stats.overdue).toBe(1);
-    });
-
-    it('should return all zeros for empty list', async () => {
-      mockSettings.getDecryptedApiKey.mockResolvedValue('api-key');
-      mockClient.request.mockResolvedValue({
-        serviceRequestList: { serviceRequest: [] },
-      });
-
-      const stats = await service.getStats(clerkOrgId);
-      expect(stats).toEqual({ total: 0, open: 0, closed: 0, overdue: 0 });
     });
   });
 });
