@@ -36,6 +36,14 @@ function toDateOrNull(value: string | undefined | null): string | null {
   return value;
 }
 
+function decodeXmlText(value: string | undefined | null): string {
+  if (!value) return '';
+  return value
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/\r\n?/g, '\n');
+}
+
 function ensureArray<T>(value: T[] | T | undefined | null): T[] {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
@@ -58,8 +66,8 @@ export function mapServiceRequestListItem(
 
   return {
     serviceRequestId: toNumber(item.serviceRequestId),
-    description: item.description ?? '',
-    detailedDescription: item.detailedDescription ?? '',
+    description: decodeXmlText(item.description),
+    detailedDescription: decodeXmlText(item.detailedDescription),
     status,
     priority: item.priority ?? '',
     priorityLabel: item.priorityLabel ?? item.priority ?? '',
@@ -90,7 +98,9 @@ export function mapServiceRequestListItem(
     customerLocationZone: item.customerLocationZone ?? '',
     customerLocationNotes: item.customerLocationNotes ?? '',
     accountManagerId: toNumberOrNull(item.accountManagerId),
+    accountManagerName: null,
     serviceManagerId: toNumberOrNull(item.serviceManagerId),
+    serviceManagerName: null,
     isOverdue: computeIsOverdue(dueDate, status),
     isOpen: computeIsOpen(status),
   };
@@ -104,8 +114,8 @@ export function mapServiceRequestDetail(
 
   return {
     serviceRequestId: toNumber(sr.serviceRequestId),
-    description: sr.description ?? '',
-    detailedDescription: sr.detailedDescription ?? '',
+    description: decodeXmlText(sr.description),
+    detailedDescription: decodeXmlText(sr.detailedDescription),
     status,
     priority: sr.priority ?? '',
     priorityLabel: sr.priority ?? '',
@@ -136,10 +146,13 @@ export function mapServiceRequestDetail(
     customerLocationZone: sr.customerLocationZone ?? '',
     customerLocationNotes: sr.customerLocationNotes ?? '',
     accountManagerId: toNumberOrNull(sr.accountManagerId),
+    accountManagerName: null,
     serviceManagerId: toNumberOrNull(sr.serviceManagerId),
+    serviceManagerName: null,
     isOverdue: computeIsOverdue(dueDate, status),
     isOpen: computeIsOpen(status),
     createdByUserId: toNumber(sr.createdByUserId),
+    createdByUserName: null,
     statusLastUpdated: toDateOrNull(sr.statusLastUpdated),
     statusAgeHours: toNumber(sr.statusAge_hours),
     purchaseOrderNo: sr.purchaseOrderNo ?? '',
@@ -160,11 +173,14 @@ export function mapServiceRequestDetail(
     assignments: ensureArray(sr.assignments?.assignment).map(
       (a): ServiceRequestAssignment => ({
         assignmentId: toNumber(a.assignmentId),
-        assigneeUserIds: (a.assigneeUserIds ?? '')
+        assigneeUserIds: String(a.assigneeUserIds ?? '')
           .split(',')
           .map((id) => id.trim())
           .filter(Boolean)
           .map(Number),
+        assigneeUserNames: [],
+        createdByUserName: null,
+        completedByUserName: null,
         type: a.type ?? '',
         startDate: toDateOrNull(a.startDate),
         endDate: toDateOrNull(a.endDate),
@@ -188,6 +204,8 @@ export function mapServiceRequestDetail(
         id: toNumber(l.id),
         serviceRequestId: toNumber(l.serviceRequestId),
         userId: toNumber(l.userId),
+        userName: null,
+        createdByUserName: null,
         dateWorked: l.dateWorked ?? '',
         duration: toNumber(l.duration),
         startTime: l.startTime ?? '',
@@ -213,6 +231,7 @@ export function mapServiceRequestDetail(
       (m): MaterialsItem => ({
         id: toNumber(m.id),
         serviceRequestId: toNumber(m.serviceRequestId),
+        createdByUserName: null,
         dateUsed: m.dateUsed ?? '',
         quantity: toNumber(m.itemQuantity),
         billingStatus: (m.billingStatus ?? 'billable') as BillingStatus,
@@ -237,6 +256,8 @@ export function mapServiceRequestDetail(
         id: toNumber(e.id),
         serviceRequestId: toNumber(e.serviceRequestId),
         userId: toNumber(e.userId),
+        userName: null,
+        createdByUserName: null,
         dateUsed: e.dateUsed ?? '',
         quantity: toNumber(e.itemQuantity),
         billingStatus: (e.billingStatus ?? 'billable') as BillingStatus,
@@ -260,6 +281,7 @@ export function mapServiceRequestDetail(
       (l): LogEntry => ({
         id: toNumber(l.id),
         serviceRequestId: toNumber(l.serviceRequestId),
+        createdByUserName: null,
         entryType: l.entryType ?? '',
         description: l.description ?? '',
         comment: l.comment ?? '',

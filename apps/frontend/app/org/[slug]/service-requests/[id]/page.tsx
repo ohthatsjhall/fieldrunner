@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useApiClient } from '@/lib/api-client-browser';
-import type { ServiceRequestDetail } from '@fieldrunner/shared';
+import type { ServiceRequestDetail, ServiceRequestFile, VendorSearchResponse } from '@fieldrunner/shared';
 
-type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'history';
+type Tab = 'overview' | 'assignments' | 'labor' | 'materials' | 'expenses' | 'equipment' | 'files' | 'history';
 
 function TabButton({
   active,
@@ -57,6 +57,9 @@ function OverviewTab({ sr }: { sr: ServiceRequestDetail }) {
           <FieldRow label="Status" value={sr.status} />
           <FieldRow label="Priority" value={sr.priority} />
           <FieldRow label="Type" value={sr.type} />
+          <FieldRow label="Account Manager" value={sr.accountManagerName} />
+          <FieldRow label="Service Manager" value={sr.serviceManagerName} />
+          <FieldRow label="Created By" value={sr.createdByUserName} />
           <FieldRow label="Created" value={sr.dateTimeCreated ? new Date(sr.dateTimeCreated).toLocaleString() : null} />
           <FieldRow label="Due Date" value={sr.dueDate ? new Date(sr.dueDate).toLocaleDateString() : null} />
           <FieldRow label="Status Age" value={sr.statusAgeHours ? `${sr.statusAgeHours.toFixed(1)} hours` : null} />
@@ -113,6 +116,11 @@ function AssignmentsTab({ sr }: { sr: ServiceRequestDetail }) {
             </span>
           </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{a.type}</p>
+          {a.assigneeUserNames.length > 0 && (
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Assigned to: {a.assigneeUserNames.join(', ')}
+            </p>
+          )}
           {a.assignmentComment && <p className="mt-2 text-sm">{a.assignmentComment}</p>}
           <div className="mt-2 flex gap-4 text-xs text-zinc-500">
             {a.startDate && <span>Start: {new Date(a.startDate).toLocaleString()}</span>}
@@ -134,6 +142,7 @@ function LaborTab({ sr }: { sr: ServiceRequestDetail }) {
       <thead className="border-b border-zinc-200 dark:border-zinc-800">
         <tr>
           <th className="px-4 py-2 font-medium text-zinc-500">Date</th>
+          <th className="px-4 py-2 font-medium text-zinc-500">User</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Description</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Duration</th>
           <th className="px-4 py-2 text-right font-medium text-zinc-500">Total</th>
@@ -143,6 +152,7 @@ function LaborTab({ sr }: { sr: ServiceRequestDetail }) {
         {sr.labor.map((l) => (
           <tr key={l.id}>
             <td className="px-4 py-2">{l.dateWorked}</td>
+            <td className="px-4 py-2">{l.userName || '-'}</td>
             <td className="px-4 py-2">{l.itemDescription}</td>
             <td className="px-4 py-2">{l.duration}h</td>
             <td className="px-4 py-2 text-right">${l.totalPrice.toFixed(2)}</td>
@@ -192,6 +202,7 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
       <thead className="border-b border-zinc-200 dark:border-zinc-800">
         <tr>
           <th className="px-4 py-2 font-medium text-zinc-500">Date</th>
+          <th className="px-4 py-2 font-medium text-zinc-500">User</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Description</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Qty</th>
           <th className="px-4 py-2 text-right font-medium text-zinc-500">Total</th>
@@ -201,6 +212,7 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
         {sr.expenses.map((e) => (
           <tr key={e.id}>
             <td className="px-4 py-2">{e.dateUsed}</td>
+            <td className="px-4 py-2">{e.userName || '-'}</td>
             <td className="px-4 py-2">{e.itemDescription}</td>
             <td className="px-4 py-2">{e.quantity}</td>
             <td className="px-4 py-2 text-right">${e.totalPrice.toFixed(2)}</td>
@@ -208,6 +220,133 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function EquipmentTab({ sr }: { sr: ServiceRequestDetail }) {
+  if (sr.equipment.length === 0) {
+    return <p className="py-4 text-sm text-zinc-500">No equipment.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {sr.equipment.map((e) => (
+        <div key={e.equipmentId} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{e.equipName || 'Unnamed Equipment'}</span>
+            {e.equipType && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                {e.equipType}
+              </span>
+            )}
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {e.mfrName && <FieldRow label="Manufacturer" value={e.mfrName} />}
+            {e.modelNo && <FieldRow label="Model" value={e.modelNo} />}
+            {e.serialNo && <FieldRow label="Serial #" value={e.serialNo} />}
+            {e.refNo && <FieldRow label="Ref #" value={e.refNo} />}
+            {e.nextServiceDate && <FieldRow label="Next Service" value={new Date(e.nextServiceDate).toLocaleDateString()} />}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function FilesTab({
+  files,
+  loading,
+  error,
+}: {
+  files: ServiceRequestFile[];
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="py-4 text-sm text-red-600">{error}</p>;
+  }
+
+  if (files.length === 0) {
+    return <p className="py-4 text-sm text-zinc-500">No files or attachments.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {files.map((f) => {
+        const key = f.serviceRequestFileId || f.serviceRequestSignedDocumentId || f.fileName;
+        const isLink = f.isExternalLink;
+        const isSigned = f.isSignedDocument;
+
+        return (
+          <div key={key} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {f.linkUrl ? (
+                    <a href={f.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                      {f.fileName || f.fileDescription || f.documentName || 'Download'}
+                    </a>
+                  ) : (
+                    f.fileName || f.documentName || f.fileDescription || 'Untitled'
+                  )}
+                </span>
+                {isSigned && (
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    Signed Document
+                  </span>
+                )}
+                {isLink && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    Link
+                  </span>
+                )}
+                {f.isPrivate && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    Private
+                  </span>
+                )}
+              </div>
+              {f.fileSize > 0 && (
+                <span className="text-xs text-zinc-500">{formatFileSize(f.fileSize)}</span>
+              )}
+            </div>
+            {f.fileDescription && f.fileDescription !== f.fileName && (
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{f.fileDescription}</p>
+            )}
+            <div className="mt-2 flex gap-4 text-xs text-zinc-500">
+              {f.postedBy && <span>By: {f.postedBy}</span>}
+              {f.postedOn && <span>{new Date(f.postedOn).toLocaleString()}</span>}
+              {f.fileType && f.fileType !== 'external' && f.fileType !== 'signedDocument' && (
+                <span>{f.fileType}</span>
+              )}
+            </div>
+            {isSigned && (f.signatureNameCustomer || f.signatureNameTechnician) && (
+              <div className="mt-2 flex gap-4 text-xs text-zinc-500">
+                {f.signatureNameCustomer && <span>Customer: {f.signatureNameCustomer}</span>}
+                {f.signatureNameTechnician && <span>Technician: {f.signatureNameTechnician}</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -225,6 +364,7 @@ function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{entry.comment}</p>
           )}
           <p className="mt-1 text-xs text-zinc-400">
+            {entry.createdByUserName && <span className="font-medium">{entry.createdByUserName} &middot; </span>}
             {entry.dateTimeCreated ? new Date(entry.dateTimeCreated).toLocaleString() : ''}
             {' '}{entry.entryType}
           </p>
@@ -243,27 +383,75 @@ export default function ServiceRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [files, setFiles] = useState<ServiceRequestFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [filesFetched, setFilesFetched] = useState(false);
+
+  const [vendorSearch, setVendorSearch] = useState<VendorSearchResponse | null>(null);
+  const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
+  const [vendorSearchError, setVendorSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !params.id) return;
 
-    // TODO: Re-enable once BlueFolder API key is configured
-    // async function fetchDetail() {
-    //   setLoading(true);
-    //   try {
-    //     const data = await apiFetch<ServiceRequestDetail>(
-    //       `/bluefolder/service-requests/${params.id}`,
-    //     );
-    //     setSr(data);
-    //   } catch (err) {
-    //     setError(err instanceof Error ? err.message : 'Failed to load service request');
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // }
-    // fetchDetail();
-    setLoading(false);
+    async function fetchDetail() {
+      setLoading(true);
+      try {
+        const data = await apiFetch<ServiceRequestDetail>(
+          `/bluefolder/service-requests/${params.id}`,
+        );
+        setSr(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load service request');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDetail();
   }, [isLoaded, params.id, apiFetch]);
+
+  const fetchFiles = useCallback(async () => {
+    if (filesFetched || filesLoading || !params.id) return;
+    setFilesLoading(true);
+    try {
+      const data = await apiFetch<ServiceRequestFile[]>(
+        `/bluefolder/service-requests/${params.id}/files`,
+      );
+      setFiles(data);
+    } catch (err) {
+      setFilesError(err instanceof Error ? err.message : 'Failed to load files');
+    } finally {
+      setFilesLoading(false);
+      setFilesFetched(true);
+    }
+  }, [filesFetched, filesLoading, params.id, apiFetch]);
+
+  useEffect(() => {
+    if (activeTab === 'files') fetchFiles();
+  }, [activeTab, fetchFiles]);
+
+  const runVendorSearch = useCallback(async () => {
+    if (!sr || vendorSearchLoading) return;
+    setVendorSearchLoading(true);
+    setVendorSearchError(null);
+    try {
+      const data = await apiFetch<VendorSearchResponse>(
+        '/vendor-sourcing/search',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            serviceRequestBluefolderId: sr.serviceRequestId,
+          }),
+        },
+      );
+      setVendorSearch(data);
+    } catch (err) {
+      setVendorSearchError(err instanceof Error ? err.message : 'Vendor search failed');
+    } finally {
+      setVendorSearchLoading(false);
+    }
+  }, [sr, vendorSearchLoading, apiFetch]);
 
   if (loading) {
     return (
@@ -297,6 +485,8 @@ export default function ServiceRequestDetailPage() {
     { key: 'labor', label: 'Labor', count: sr.labor.length },
     { key: 'materials', label: 'Materials', count: sr.materials.length },
     { key: 'expenses', label: 'Expenses', count: sr.expenses.length },
+    { key: 'equipment', label: 'Equipment', count: sr.equipment.length },
+    { key: 'files', label: 'Files', count: filesFetched ? files.length : undefined },
     { key: 'history', label: 'History', count: sr.log.length },
   ];
 
@@ -328,7 +518,7 @@ export default function ServiceRequestDetailPage() {
         </div>
         <p className="mt-1 text-zinc-600 dark:text-zinc-400">{sr.description}</p>
         {sr.detailedDescription && (
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{sr.detailedDescription}</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-zinc-500 dark:text-zinc-400">{sr.detailedDescription}</p>
         )}
       </div>
 
@@ -352,8 +542,96 @@ export default function ServiceRequestDetailPage() {
         {activeTab === 'labor' && <LaborTab sr={sr} />}
         {activeTab === 'materials' && <MaterialsTab sr={sr} />}
         {activeTab === 'expenses' && <ExpensesTab sr={sr} />}
+        {activeTab === 'equipment' && <EquipmentTab sr={sr} />}
+        {activeTab === 'files' && <FilesTab files={files} loading={filesLoading} error={filesError} />}
         {activeTab === 'history' && <HistoryTab sr={sr} />}
       </div>
+
+      {sr.status.toLowerCase() === 'assigned' && (
+        <div className="rounded-lg border border-dashed border-amber-400 bg-amber-50 p-4 dark:border-amber-600 dark:bg-amber-950/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Vendor Sourcing (Debug)
+              </h3>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Status is &quot;Assigned&quot; &mdash; find local vendors for this SR
+              </p>
+            </div>
+            <button
+              onClick={runVendorSearch}
+              disabled={vendorSearchLoading}
+              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {vendorSearchLoading ? 'Searching...' : 'Find Vendors'}
+            </button>
+          </div>
+
+          {vendorSearchError && (
+            <p className="mt-3 text-sm text-red-600">{vendorSearchError}</p>
+          )}
+
+          {vendorSearch && (
+            <div className="mt-4 space-y-3">
+              <div className="flex gap-4 text-xs text-amber-700 dark:text-amber-400">
+                <span>Session: {vendorSearch.sessionId.slice(0, 8)}...</span>
+                <span>Status: {vendorSearch.status}</span>
+                <span>Query: &quot;{vendorSearch.searchQuery}&quot;</span>
+                <span>Results: {vendorSearch.resultCount}</span>
+                <span>Duration: {vendorSearch.durationMs}ms</span>
+              </div>
+
+              {vendorSearch.candidates.length > 0 ? (
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-amber-200 dark:border-amber-800">
+                    <tr className="text-xs text-amber-700 dark:text-amber-400">
+                      <th className="px-2 py-1">#</th>
+                      <th className="px-2 py-1">Name</th>
+                      <th className="px-2 py-1">Phone</th>
+                      <th className="px-2 py-1">Rating</th>
+                      <th className="px-2 py-1">Reviews</th>
+                      <th className="px-2 py-1">Score</th>
+                      <th className="px-2 py-1">Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 dark:divide-amber-900">
+                    {vendorSearch.candidates.map((c) => (
+                      <tr key={c.vendorId} className="text-zinc-800 dark:text-zinc-200">
+                        <td className="px-2 py-2 font-mono text-xs">{c.rank}</td>
+                        <td className="px-2 py-2">
+                          <div className="font-medium">{c.name}</div>
+                          {c.address && <div className="text-xs text-zinc-500">{c.address}</div>}
+                          {c.website && (
+                            <a href={c.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">
+                              {c.website}
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 font-mono text-xs">{c.phoneRaw || '-'}</td>
+                        <td className="px-2 py-2">{c.rating?.toFixed(1) ?? '-'}</td>
+                        <td className="px-2 py-2">{c.reviewCount ?? '-'}</td>
+                        <td className="px-2 py-2 font-mono font-bold">{c.score.toFixed(1)}</td>
+                        <td className="px-2 py-2 font-mono text-xs text-zinc-500">
+                          D:{c.scores.distance?.toFixed(0)} R:{c.scores.rating?.toFixed(0)} RC:{c.scores.reviewCount?.toFixed(0)} C:{c.scores.categoryMatch?.toFixed(0)} H:{c.scores.businessHours?.toFixed(0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-zinc-500">No vendors found.</p>
+              )}
+
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-amber-600 dark:text-amber-400">Raw JSON</summary>
+                <pre className="mt-1 max-h-64 overflow-auto rounded bg-zinc-900 p-3 text-xs text-green-400">
+                  {JSON.stringify(vendorSearch, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

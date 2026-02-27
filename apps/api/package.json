@@ -27,6 +27,7 @@
     "db:seed-api-key": "bun run scripts/seed-api-key.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@clerk/backend": "^2.31.0",
     "@fieldrunner/shared": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",

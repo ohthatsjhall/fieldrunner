@@ -56,6 +56,7 @@ export const BLUEFOLDER_ARRAY_TAGS = new Set([
   'serviceRequestAssignment',
   'FieldListValue',
   'userId',
+  'user',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -620,9 +621,11 @@ export interface BfServiceRequestListResponse {
   };
 }
 
-/** Envelope for the single-get response. */
+/** Envelope for the single-get response.
+ * Note: serviceRequest is forced to array by isArray parser config
+ * (BLUEFOLDER_ARRAY_TAGS includes 'serviceRequest' for the list endpoint). */
 export interface BfServiceRequestGetResponse {
-  serviceRequest: BfServiceRequest;
+  serviceRequest: BfServiceRequest[];
 }
 
 // ---------------------------------------------------------------------------
@@ -883,3 +886,29 @@ export interface BfAssignmentListFilter {
 // ---------------------------------------------------------------------------
 
 export type BfBillingStatus = 'billable' | 'non-billable' | 'contract';
+
+// ---------------------------------------------------------------------------
+// 10. User (GET /users/list.aspx)
+// ---------------------------------------------------------------------------
+
+export interface BfUser {
+  /** @numeric BlueFolder user ID. */
+  userId: string;
+  /** User's first name. */
+  firstName: string;
+  /** User's last name. */
+  lastName: string;
+  /** Display name (typically "First Last"). */
+  displayName: string;
+  /** @boolean "true" or "false". Whether the user is inactive. */
+  inactive: string;
+  /** Login username. */
+  userName: string;
+  /** User type (e.g. "Admin", "Tech"). */
+  userType: string;
+}
+
+export interface BfUserListResponse {
+  /** @isArray — user elements are direct children of <response>, no wrapper. */
+  user: BfUser[];
+}

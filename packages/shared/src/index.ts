@@ -10,7 +10,19 @@ export type {
   RolePermission,
   OrganizationSettings,
   ServiceRequest,
+  BlueFolderUser,
+  TradeCategory,
+  Vendor,
+  VendorSourceRecord,
+  VendorSearchSession,
+  VendorSearchResult,
 } from './database.js';
+export type {
+  VendorCandidate,
+  VendorSearchStatus,
+  VendorSearchResponse,
+  VendorSearchRequest,
+} from './vendor-sourcing.js';
 export type {
   ServiceRequestSummary,
   ServiceRequestDetail,
