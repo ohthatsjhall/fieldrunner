@@ -2,6 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ServiceRequestsService } from './service-requests.service';
 import { BlueFolderService } from './bluefolder.service';
+import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { ServiceRequestSummary } from '@fieldrunner/shared';
@@ -43,7 +44,9 @@ function makeSummary(
     customerLocationZone: '',
     customerLocationNotes: '',
     accountManagerId: null,
+    accountManagerName: null,
     serviceManagerId: null,
+    serviceManagerName: null,
     isOverdue: false,
     isOpen: true,
     ...overrides,
@@ -53,6 +56,7 @@ function makeSummary(
 describe('ServiceRequestsService', () => {
   let service: ServiceRequestsService;
   let mockBlueFolderService: jest.Mocked<BlueFolderService>;
+  let mockUsersService: jest.Mocked<BlueFolderUsersService>;
   let mockSettings: jest.Mocked<OrganizationSettingsService>;
   let mockDb: any;
 
@@ -65,6 +69,11 @@ describe('ServiceRequestsService', () => {
       getServiceRequest: jest.fn(),
       getStats: jest.fn(),
     } as unknown as jest.Mocked<BlueFolderService>;
+
+    mockUsersService = {
+      sync: jest.fn().mockResolvedValue({ total: 0, syncedAt: new Date() }),
+      buildUserMap: jest.fn().mockResolvedValue(new Map()),
+    } as unknown as jest.Mocked<BlueFolderUsersService>;
 
     mockSettings = {
       resolveOrgId: jest.fn().mockResolvedValue(internalOrgId),
@@ -90,6 +99,7 @@ describe('ServiceRequestsService', () => {
       providers: [
         ServiceRequestsService,
         { provide: BlueFolderService, useValue: mockBlueFolderService },
+        { provide: BlueFolderUsersService, useValue: mockUsersService },
         { provide: OrganizationSettingsService, useValue: mockSettings },
         { provide: DATABASE_CONNECTION, useValue: mockDb },
       ],
@@ -137,6 +147,32 @@ describe('ServiceRequestsService', () => {
       await service.sync(clerkOrgId);
 
       expect(mockSettings.resolveOrgId).toHaveBeenCalledWith(clerkOrgId);
+    });
+
+    it('should call user sync before SR sync', async () => {
+      const callOrder: string[] = [];
+      mockUsersService.sync.mockImplementation(async () => {
+        callOrder.push('userSync');
+        return { total: 5, syncedAt: new Date() };
+      });
+      mockBlueFolderService.listServiceRequests.mockImplementation(async () => {
+        callOrder.push('srList');
+        return [];
+      });
+
+      await service.sync(clerkOrgId);
+
+      expect(callOrder).toEqual(['userSync', 'srList']);
+    });
+
+    it('should continue SR sync even if user sync fails', async () => {
+      mockUsersService.sync.mockRejectedValue(new Error('User API down'));
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([]);
+
+      const result = await service.sync(clerkOrgId);
+
+      expect(result.total).toBe(0);
+      expect(mockBlueFolderService.listServiceRequests).toHaveBeenCalled();
     });
   });
 

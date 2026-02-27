@@ -146,3 +146,18 @@ export type ServiceRequest = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type BlueFolderUser = {
+  id: string;
+  organizationId: string;
+  bluefolderId: number;
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  userName: string | null;
+  userType: string | null;
+  inactive: boolean;
+  syncedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};

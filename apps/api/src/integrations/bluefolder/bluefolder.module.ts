@@ -4,6 +4,7 @@ import { BlueFolderController } from './bluefolder.controller';
 import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderClientService } from './bluefolder-client.service';
 import { BlueFolderExceptionFilter } from './bluefolder-exception.filter';
+import { BlueFolderUsersService } from './bluefolder-users.service';
 import { ServiceRequestsService } from './service-requests.service';
 import { OrganizationSettingsModule } from '../../org/settings/settings.module';
 
@@ -13,6 +14,7 @@ import { OrganizationSettingsModule } from '../../org/settings/settings.module';
   providers: [
     BlueFolderService,
     BlueFolderClientService,
+    BlueFolderUsersService,
     ServiceRequestsService,
     {
       provide: APP_FILTER,

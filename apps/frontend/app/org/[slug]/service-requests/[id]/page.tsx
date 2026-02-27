@@ -57,6 +57,9 @@ function OverviewTab({ sr }: { sr: ServiceRequestDetail }) {
           <FieldRow label="Status" value={sr.status} />
           <FieldRow label="Priority" value={sr.priority} />
           <FieldRow label="Type" value={sr.type} />
+          <FieldRow label="Account Manager" value={sr.accountManagerName} />
+          <FieldRow label="Service Manager" value={sr.serviceManagerName} />
+          <FieldRow label="Created By" value={sr.createdByUserName} />
           <FieldRow label="Created" value={sr.dateTimeCreated ? new Date(sr.dateTimeCreated).toLocaleString() : null} />
           <FieldRow label="Due Date" value={sr.dueDate ? new Date(sr.dueDate).toLocaleDateString() : null} />
           <FieldRow label="Status Age" value={sr.statusAgeHours ? `${sr.statusAgeHours.toFixed(1)} hours` : null} />
@@ -113,6 +116,11 @@ function AssignmentsTab({ sr }: { sr: ServiceRequestDetail }) {
             </span>
           </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{a.type}</p>
+          {a.assigneeUserNames.length > 0 && (
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Assigned to: {a.assigneeUserNames.join(', ')}
+            </p>
+          )}
           {a.assignmentComment && <p className="mt-2 text-sm">{a.assignmentComment}</p>}
           <div className="mt-2 flex gap-4 text-xs text-zinc-500">
             {a.startDate && <span>Start: {new Date(a.startDate).toLocaleString()}</span>}
@@ -134,6 +142,7 @@ function LaborTab({ sr }: { sr: ServiceRequestDetail }) {
       <thead className="border-b border-zinc-200 dark:border-zinc-800">
         <tr>
           <th className="px-4 py-2 font-medium text-zinc-500">Date</th>
+          <th className="px-4 py-2 font-medium text-zinc-500">User</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Description</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Duration</th>
           <th className="px-4 py-2 text-right font-medium text-zinc-500">Total</th>
@@ -143,6 +152,7 @@ function LaborTab({ sr }: { sr: ServiceRequestDetail }) {
         {sr.labor.map((l) => (
           <tr key={l.id}>
             <td className="px-4 py-2">{l.dateWorked}</td>
+            <td className="px-4 py-2">{l.userName || '-'}</td>
             <td className="px-4 py-2">{l.itemDescription}</td>
             <td className="px-4 py-2">{l.duration}h</td>
             <td className="px-4 py-2 text-right">${l.totalPrice.toFixed(2)}</td>
@@ -192,6 +202,7 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
       <thead className="border-b border-zinc-200 dark:border-zinc-800">
         <tr>
           <th className="px-4 py-2 font-medium text-zinc-500">Date</th>
+          <th className="px-4 py-2 font-medium text-zinc-500">User</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Description</th>
           <th className="px-4 py-2 font-medium text-zinc-500">Qty</th>
           <th className="px-4 py-2 text-right font-medium text-zinc-500">Total</th>
@@ -201,6 +212,7 @@ function ExpensesTab({ sr }: { sr: ServiceRequestDetail }) {
         {sr.expenses.map((e) => (
           <tr key={e.id}>
             <td className="px-4 py-2">{e.dateUsed}</td>
+            <td className="px-4 py-2">{e.userName || '-'}</td>
             <td className="px-4 py-2">{e.itemDescription}</td>
             <td className="px-4 py-2">{e.quantity}</td>
             <td className="px-4 py-2 text-right">${e.totalPrice.toFixed(2)}</td>
@@ -352,6 +364,7 @@ function HistoryTab({ sr }: { sr: ServiceRequestDetail }) {
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{entry.comment}</p>
           )}
           <p className="mt-1 text-xs text-zinc-400">
+            {entry.createdByUserName && <span className="font-medium">{entry.createdByUserName} &middot; </span>}
             {entry.dateTimeCreated ? new Date(entry.dateTimeCreated).toLocaleString() : ''}
             {' '}{entry.entryType}
           </p>

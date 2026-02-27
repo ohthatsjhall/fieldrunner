@@ -10,6 +10,7 @@ export type {
   RolePermission,
   OrganizationSettings,
   ServiceRequest,
+  BlueFolderUser,
 } from './database.js';
 export type {
   ServiceRequestSummary,

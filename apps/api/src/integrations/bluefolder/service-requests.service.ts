@@ -9,6 +9,7 @@ import {
   organizationSettings,
 } from '../../core/database/schema';
 import { BlueFolderService } from './bluefolder.service';
+import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 
 export interface SyncResult {
@@ -31,10 +32,21 @@ export class ServiceRequestsService {
     @Inject(DATABASE_CONNECTION)
     private readonly db: Database,
     private readonly blueFolderService: BlueFolderService,
+    private readonly usersService: BlueFolderUsersService,
     private readonly settingsService: OrganizationSettingsService,
   ) {}
 
   async sync(clerkOrgId: string): Promise<SyncResult> {
+    // Sync users first so name resolution is up-to-date for SR enrichment
+    try {
+      await this.usersService.sync(clerkOrgId);
+    } catch (err) {
+      this.logger.warn('User sync failed, continuing with SR sync', {
+        clerkOrgId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
     const items = await this.blueFolderService.listServiceRequests(clerkOrgId);
     const syncedAt = new Date();

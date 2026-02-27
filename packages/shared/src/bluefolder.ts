@@ -81,8 +81,12 @@ export interface ServiceRequestSummary {
 
   /** Account manager user ID. Null if unassigned. */
   accountManagerId: number | null;
+  /** Resolved display name of the account manager. */
+  accountManagerName: string | null;
   /** Service manager user ID. Null if unassigned. */
   serviceManagerId: number | null;
+  /** Resolved display name of the service manager. */
+  serviceManagerName: string | null;
 
   // -- Computed --
 
@@ -99,6 +103,8 @@ export interface ServiceRequestSummary {
 export interface ServiceRequestDetail extends ServiceRequestSummary {
   /** User ID who created the SR. */
   createdByUserId: number;
+  /** Resolved display name of the creator. */
+  createdByUserName: string | null;
   /** ISO 8601. When status was last changed. */
   statusLastUpdated: string | null;
   /** Hours since the last status change. */
@@ -147,6 +153,10 @@ export interface ServiceRequestAssignment {
   assignmentId: number;
   /** User IDs assigned. Normalized from comma-separated or nested formats. */
   assigneeUserIds: number[];
+  /** Resolved display names of the assignees. */
+  assigneeUserNames: string[];
+  createdByUserName: string | null;
+  completedByUserName: string | null;
   type: string;
   /** ISO 8601. */
   startDate: string | null;
@@ -172,6 +182,8 @@ export interface LaborItem {
   id: number;
   serviceRequestId: number;
   userId: number;
+  userName: string | null;
+  createdByUserName: string | null;
   /** ISO 8601 date. */
   dateWorked: string;
   /** Duration in hours. */
@@ -204,6 +216,7 @@ export interface LaborItem {
 export interface MaterialsItem {
   id: number;
   serviceRequestId: number;
+  createdByUserName: string | null;
   /** ISO 8601 date. */
   dateUsed: string;
   quantity: number;
@@ -234,6 +247,8 @@ export interface ExpenseItem {
   id: number;
   serviceRequestId: number;
   userId: number;
+  userName: string | null;
+  createdByUserName: string | null;
   /** ISO 8601 date. */
   dateUsed: string;
   quantity: number;
@@ -262,6 +277,7 @@ export interface ExpenseItem {
 export interface LogEntry {
   id: number;
   serviceRequestId: number;
+  createdByUserName: string | null;
   /** Log entry type (e.g. "comment", "edit", "statusChange", "close"). */
   entryType: string;
   description: string;

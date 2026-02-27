@@ -8,18 +8,25 @@ import {
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
 import { BlueFolderService } from './bluefolder.service';
+import { BlueFolderUsersService } from './bluefolder-users.service';
 import { ServiceRequestsService } from './service-requests.service';
 
 @Controller('bluefolder')
 export class BlueFolderController {
   constructor(
     private readonly blueFolderService: BlueFolderService,
+    private readonly usersService: BlueFolderUsersService,
     private readonly serviceRequestsService: ServiceRequestsService,
   ) {}
 
   @Post('sync')
   sync(@CurrentOrg() org: AuthOrganization) {
     return this.serviceRequestsService.sync(org.orgId);
+  }
+
+  @Post('sync-users')
+  syncUsers(@CurrentOrg() org: AuthOrganization) {
+    return this.usersService.sync(org.orgId);
   }
 
   @Get('service-requests')

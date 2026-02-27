@@ -9,3 +9,4 @@ export * from './role-permissions';
 export * from './webhook-events';
 export * from './organization-settings';
 export * from './service-requests';
+export * from './bluefolder-users';
