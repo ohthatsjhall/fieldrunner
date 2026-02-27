@@ -59,6 +59,15 @@ describe('GooglePlacesProvider', () => {
     });
   });
 
+  it('should throw if GOOGLE_PLACES_API_KEY is not configured', () => {
+    const emptyConfig = {
+      get: jest.fn().mockReturnValue(undefined),
+    } as unknown as jest.Mocked<ConfigService>;
+    expect(() => new GooglePlacesProvider(emptyConfig)).toThrow(
+      'GOOGLE_PLACES_API_KEY is not configured',
+    );
+  });
+
   describe('search', () => {
     it('should call Google Places Text Search API and return normalized results', async () => {
       mockFetch.mockResolvedValue({

@@ -19,6 +19,7 @@ export type {
 } from './database.js';
 export type {
   VendorCandidate,
+  VendorSearchStatus,
   VendorSearchResponse,
   VendorSearchRequest,
 } from './vendor-sourcing.js';

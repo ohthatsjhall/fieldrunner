@@ -21,9 +21,11 @@ export type VendorCandidate = {
   };
 };
 
+export type VendorSearchStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+
 export type VendorSearchResponse = {
   sessionId: string;
-  status: string;
+  status: VendorSearchStatus;
   searchQuery: string;
   searchAddress: string;
   resultCount: number;

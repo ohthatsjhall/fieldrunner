@@ -31,9 +31,13 @@ export class SearchQueryGeneratorService {
   private readonly client: Anthropic;
 
   constructor(private readonly config: ConfigService) {
-    this.client = new Anthropic({
-      apiKey: this.config.get<string>('ANTHROPIC_API_KEY'),
-    });
+    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    if (!apiKey) {
+      throw new Error(
+        'ANTHROPIC_API_KEY is not configured. AI-powered search query generation requires a valid Anthropic API key.',
+      );
+    }
+    this.client = new Anthropic({ apiKey });
   }
 
   async generateSearchQueries(

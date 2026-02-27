@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   ParseUUIDPipe,
+  NotFoundException,
 } from '@nestjs/common';
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
@@ -36,13 +37,25 @@ export class VendorSourcingController {
   }
 
   @Get('sessions/:id')
-  getSession(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vendorSourcingService.getSession(id);
+  async getSession(
+    @CurrentOrg() org: AuthOrganization,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const organizationId = await this.settingsService.resolveOrgId(org.orgId);
+    const session = await this.vendorSourcingService.getSession(organizationId, id);
+    if (!session) throw new NotFoundException(`Search session ${id} not found`);
+    return session;
   }
 
   @Get('vendors/:id')
-  getVendorDetail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vendorSourcingService.getVendorDetail(id);
+  async getVendorDetail(
+    @CurrentOrg() org: AuthOrganization,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const organizationId = await this.settingsService.resolveOrgId(org.orgId);
+    const vendor = await this.vendorSourcingService.getVendorDetail(organizationId, id);
+    if (!vendor) throw new NotFoundException(`Vendor ${id} not found`);
+    return vendor;
   }
 
   @Get('trade-categories')

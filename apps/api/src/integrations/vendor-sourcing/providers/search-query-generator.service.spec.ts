@@ -94,6 +94,21 @@ describe('SearchQueryGeneratorService', () => {
     service = module.get(SearchQueryGeneratorService);
   });
 
+  it('should throw if ANTHROPIC_API_KEY is not configured', async () => {
+    const emptyConfig = {
+      get: jest.fn().mockReturnValue(undefined),
+    } as unknown as jest.Mocked<ConfigService>;
+
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          SearchQueryGeneratorService,
+          { provide: ConfigService, useValue: emptyConfig },
+        ],
+      }).compile(),
+    ).rejects.toThrow('ANTHROPIC_API_KEY is not configured');
+  });
+
   describe('generateSearchQueries', () => {
     it('should return parsed queries and category from Claude response', async () => {
       mockCreate.mockResolvedValue({

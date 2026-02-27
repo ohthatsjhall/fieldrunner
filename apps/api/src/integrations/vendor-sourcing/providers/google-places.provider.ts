@@ -37,7 +37,13 @@ export class GooglePlacesProvider implements PlaceProvider {
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.get<string>('GOOGLE_PLACES_API_KEY') ?? '';
+    const apiKey = this.config.get<string>('GOOGLE_PLACES_API_KEY');
+    if (!apiKey) {
+      throw new Error(
+        'GOOGLE_PLACES_API_KEY is not configured. Vendor sourcing requires a valid Google Places API key.',
+      );
+    }
+    this.apiKey = apiKey;
   }
 
   async search(params: PlaceSearchParams): Promise<NormalizedPlace[]> {

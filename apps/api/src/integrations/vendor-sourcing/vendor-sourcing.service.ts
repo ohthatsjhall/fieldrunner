@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
   vendors,
@@ -17,7 +17,7 @@ import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { normalizePhone } from './mappers';
 import type { NormalizedPlace } from './providers/provider.interface';
-import type { ScoringInput } from './scoring/scoring.types';
+import type { ScoringInput, ScoredResult } from './scoring/scoring.types';
 import type { VendorSearchResponse, VendorCandidate } from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../core/database/schema';
@@ -233,7 +233,13 @@ export class VendorSourcingService {
         .where(eq(vendorSearchSessions.id, session.id));
 
       // 9. Build response
-      const candidates = this.buildCandidates(ranked, vendorIds, allPlaces);
+      const candidates = this.buildCandidates(
+        ranked,
+        vendorIds,
+        allPlaces,
+        geocoded!.latitude,
+        geocoded!.longitude,
+      );
 
       return {
         sessionId: session.id,
@@ -272,11 +278,16 @@ export class VendorSourcingService {
     }
   }
 
-  async getSession(sessionId: string) {
+  async getSession(organizationId: string, sessionId: string) {
     const sessions = await this.db
       .select()
       .from(vendorSearchSessions)
-      .where(eq(vendorSearchSessions.id, sessionId));
+      .where(
+        and(
+          eq(vendorSearchSessions.id, sessionId),
+          eq(vendorSearchSessions.organizationId, organizationId),
+        ),
+      );
 
     if (!sessions.length) return null;
 
@@ -291,7 +302,7 @@ export class VendorSourcingService {
         ? await this.db
             .select()
             .from(vendors)
-            .where(eq(vendors.id, vendorIds[0]))
+            .where(inArray(vendors.id, vendorIds))
         : [];
 
     return {
@@ -308,11 +319,16 @@ export class VendorSourcingService {
       .where(eq(vendorSearchSessions.organizationId, organizationId));
   }
 
-  async getVendorDetail(vendorId: string) {
+  async getVendorDetail(organizationId: string, vendorId: string) {
     const vendorRows = await this.db
       .select()
       .from(vendors)
-      .where(eq(vendors.id, vendorId));
+      .where(
+        and(
+          eq(vendors.id, vendorId),
+          eq(vendors.organizationId, organizationId),
+        ),
+      );
 
     if (!vendorRows.length) return null;
 
@@ -476,13 +492,20 @@ export class VendorSourcingService {
   }
 
   private buildCandidates(
-    ranked: { id: string; rank: number; scored: any }[],
+    ranked: { id: string; rank: number; scored: ScoredResult }[],
     vendorIds: string[],
     places: NormalizedPlace[],
+    searchLat: number,
+    searchLng: number,
   ): VendorCandidate[] {
     return ranked.map((r) => {
       const placeIndex = vendorIds.indexOf(r.id);
       const p = placeIndex >= 0 ? places[placeIndex] : null;
+
+      const distanceMeters =
+        p?.latitude != null && p?.longitude != null
+          ? this.haversine(searchLat, searchLng, p.latitude, p.longitude)
+          : null;
 
       return {
         vendorId: r.id,
@@ -495,7 +518,7 @@ export class VendorSourcingService {
         website: p?.website ?? null,
         rating: p?.rating ?? null,
         reviewCount: p?.reviewCount ?? null,
-        distanceMeters: null,
+        distanceMeters,
         categories: p?.types ?? null,
         googlePlaceId: p?.sourceId ?? null,
         scores: {

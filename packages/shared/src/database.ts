@@ -227,7 +227,7 @@ export type VendorSearchSession = {
   searchLatitude: string | null;
   searchLongitude: string | null;
   searchRadiusMeters: number;
-  status: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
   resultCount: number;
   sources: Record<string, number> | null;
   errorMessage: string | null;
