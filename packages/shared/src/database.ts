@@ -161,3 +161,94 @@ export type BlueFolderUser = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type TradeCategory = {
+  id: string;
+  organizationId: string;
+  name: string;
+  searchQueries: string[];
+  googlePlacesType: string | null;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Vendor = {
+  id: string;
+  organizationId: string;
+  name: string;
+  phone: string | null;
+  phoneRaw: string | null;
+  address: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  website: string | null;
+  googlePlaceId: string | null;
+  rating: string | null;
+  reviewCount: number | null;
+  categories: string[] | null;
+  sourceCount: number;
+  lastSeenAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type VendorSourceRecord = {
+  id: string;
+  vendorId: string;
+  source: string;
+  sourceId: string;
+  rawData: Record<string, unknown> | null;
+  name: string | null;
+  address: string | null;
+  phone: string | null;
+  rating: string | null;
+  reviewCount: number | null;
+  website: string | null;
+  types: string[] | null;
+  businessHours: Record<string, unknown> | null;
+  fetchedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type VendorSearchSession = {
+  id: string;
+  organizationId: string;
+  serviceRequestId: string | null;
+  tradeCategoryId: string | null;
+  searchQuery: string;
+  searchAddress: string;
+  searchLatitude: string | null;
+  searchLongitude: string | null;
+  searchRadiusMeters: number;
+  status: string;
+  resultCount: number;
+  sources: Record<string, number> | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  initiatedBy: string | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type VendorSearchResult = {
+  id: string;
+  searchSessionId: string;
+  vendorId: string;
+  rank: number;
+  score: string;
+  distanceScore: string | null;
+  ratingScore: string | null;
+  reviewCountScore: string | null;
+  categoryMatchScore: string | null;
+  businessHoursScore: string | null;
+  distanceMeters: string | null;
+  createdAt: Date;
+};

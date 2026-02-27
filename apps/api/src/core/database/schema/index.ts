@@ -10,3 +10,8 @@ export * from './webhook-events';
 export * from './organization-settings';
 export * from './service-requests';
 export * from './bluefolder-users';
+export * from './trade-categories';
+export * from './vendors';
+export * from './vendor-source-records';
+export * from './vendor-search-sessions';
+export * from './vendor-search-results';
