@@ -11,6 +11,7 @@ import { relations } from 'drizzle-orm';
 import { organizationMemberships } from './organization-memberships';
 import { organizationInvitations } from './organization-invitations';
 import { organizationDomains } from './organization-domains';
+import { organizationSettings } from './organization-settings';
 
 export const organizations = pgTable('organizations', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -37,8 +38,12 @@ export const organizations = pgTable('organizations', {
   deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
 });
 
-export const organizationsRelations = relations(organizations, ({ many }) => ({
-  memberships: many(organizationMemberships),
-  invitations: many(organizationInvitations),
-  domains: many(organizationDomains),
-}));
+export const organizationsRelations = relations(
+  organizations,
+  ({ many, one }) => ({
+    memberships: many(organizationMemberships),
+    invitations: many(organizationInvitations),
+    domains: many(organizationDomains),
+    settings: one(organizationSettings),
+  }),
+);

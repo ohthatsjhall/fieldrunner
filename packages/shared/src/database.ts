@@ -116,3 +116,11 @@ export type RolePermission = {
   roleId: string;
   permissionId: string;
 };
+
+export type OrganizationSettings = {
+  id: string;
+  organizationId: string;
+  bluefolderApiKeyHint: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
