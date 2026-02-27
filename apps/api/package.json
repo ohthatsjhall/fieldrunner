@@ -23,7 +23,8 @@
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:reset": "bun run scripts/db-reset.ts"
+    "db:reset": "bun run scripts/db-reset.ts",
+    "db:seed-api-key": "bun run scripts/seed-api-key.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.31.0",
