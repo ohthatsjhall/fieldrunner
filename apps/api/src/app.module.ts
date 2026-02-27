@@ -8,6 +8,7 @@ import { DebugModule } from './debug/debug.module';
 import { DatabaseModule } from './core/database/database.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { BlueFolderModule } from './integrations/bluefolder/bluefolder.module';
+import { VendorSourcingModule } from './integrations/vendor-sourcing/vendor-sourcing.module';
 import { OrgModule } from './org/org.module';
 
 @Module({
@@ -68,6 +69,7 @@ import { OrgModule } from './org/org.module';
     WebhooksModule,
     OrgModule,
     BlueFolderModule,
+    VendorSourcingModule,
   ],
   controllers: [],
   providers: [],

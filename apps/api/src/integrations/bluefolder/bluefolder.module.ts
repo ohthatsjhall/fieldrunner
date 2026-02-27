@@ -21,5 +21,6 @@ import { OrganizationSettingsModule } from '../../org/settings/settings.module';
       useClass: BlueFolderExceptionFilter,
     },
   ],
+  exports: [BlueFolderService],
 })
 export class BlueFolderModule {}
