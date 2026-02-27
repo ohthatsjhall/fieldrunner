@@ -1,0 +1,102 @@
+# https://support.bluefolder.com/hc/en-us llms.txt
+
+- [BlueFolder Support Center](https://support.bluefolder.com/hc/en-us): Access articles, FAQs, and submit requests for assistance.
+- [BlueFolder API Documentation](https://support.bluefolder.com/hc/en-us/sections/200381849-api-2-0): Explore BlueFolder API 2.0 for application integration guidance.
+- [BlueFolder API 2.0](https://support.bluefolder.com/hc/en-us/sections/200381849-API-2-0): Comprehensive guide for developers using BlueFolder API.
+- [Mobile Access Guide](https://support.bluefolder.com/hc/en-us/articles/201417659-Mobile-access): Learn how to access BlueFolder's mobile web app.
+- [Billing Overview Guide](https://support.bluefolder.com/hc/en-us/articles/201554189-Billing-Overview): Streamline service billing and invoicing with BlueFolder.
+- [Calendar Scheduling Overview](https://support.bluefolder.com/hc/en-us/articles/201554299-Calendar-Scheduling-Overview): Explore team and individual calendar views for scheduling.
+- [Contracts Management Overview](https://support.bluefolder.com/hc/en-us/articles/201554309-Contracts-Overview): Learn to create and manage service contracts effectively.
+- [Importing Items Guide](https://support.bluefolder.com/hc/en-us/articles/201554389-Importing-Items-Overview): Learn how to import item data into BlueFolder.
+- [Customer Portal Overview](https://support.bluefolder.com/hc/en-us/articles/201554529-Customer-Portal-Overview): Explore features and management of the Customer Portal.
+- [Account Options Configuration](https://support.bluefolder.com/hc/en-us/articles/201554549-Configure-Account-Options): Enable or disable features for your Bluefolder account.
+- [Billing System Integration](https://support.bluefolder.com/hc/en-us/articles/201554559-Customize-Billing-System-Integration-Options): Customize billing export formats and QuickBooks options here.
+- [Billing Summary Customization](https://support.bluefolder.com/hc/en-us/articles/201554579-Customize-Your-Billing-Summary): Learn how to customize your billing summary document.
+- [Custom Fields Overview](https://support.bluefolder.com/hc/en-us/articles/201554589-Custom-Fields-Overview): Learn to add custom fields for tracking specific data.
+- [Upload Your Logo](https://support.bluefolder.com/hc/en-us/articles/201554599-Uploading-Your-Logo): Learn how to upload your logo for BlueFolder.
+- [Customize Work Orders](https://support.bluefolder.com/hc/en-us/articles/201554609-Customize-Your-Work-Orders): Learn to customize fields and terminology in work orders.
+- [Setting Up Tax Codes](https://support.bluefolder.com/hc/en-us/articles/201554619-Setting-up-Tax-Codes): Learn to create and manage tax codes effectively.
+- [Create New Items Guide](https://support.bluefolder.com/hc/en-us/articles/201554629-How-to-create-new-items): Learn how to create new items in BlueFolder.
+- [Import Items Guide](https://support.bluefolder.com/hc/en-us/articles/201554639-How-to-Import-Items-Labor-Materials-Expenses): Learn to import items, labor, materials, and expenses.
+- [Item List Overview](https://support.bluefolder.com/hc/en-us/articles/201554649-Item-List-Overview): Manage service items for customer support in BlueFolder.
+- [User Groups Overview](https://support.bluefolder.com/hc/en-us/articles/201554659-User-Groups): Learn to categorize users with customizable user groups.
+- [Add New User](https://support.bluefolder.com/hc/en-us/articles/201580419-Adding-a-New-User): Guide for creating new user accounts in Bluefolder.
+- [Set Default Tax Rate](https://support.bluefolder.com/hc/en-us/articles/201624959-How-to-Set-a-Default-Tax-Rate-for-a-Customer): Learn how to set a default tax rate for customers.
+- [Update Credit Card](https://support.bluefolder.com/hc/en-us/articles/201627289-Updating-Your-Credit-Card-Information): Learn to update your BlueFolder billing information securely.
+- [Recurring Work Orders](https://support.bluefolder.com/hc/en-us/articles/201627399-Tracking-Recurring-Work-Orders): Learn to track and manage recurring work orders easily.
+- [Customize Your Start Page](https://support.bluefolder.com/hc/en-us/articles/201800739-Start-Page): Learn how to set your personalized BlueFolder Start Page.
+- [Change Your Password](https://support.bluefolder.com/hc/en-us/articles/201800769-Change-My-Password): Learn how to change your BlueFolder account password.
+- [Calendar Sync Guide](https://support.bluefolder.com/hc/en-us/articles/201803519-Calendar-Sync): Learn to sync BlueFolder calendar with Google, Outlook, Apple.
+- [Find Your Account URL](https://support.bluefolder.com/hc/en-us/articles/201822249-Account-URL): Learn how to locate and change your BlueFolder URL.
+- [Customer Management Overview](https://support.bluefolder.com/hc/en-us/articles/201858975-Customers-Overview): Manage and track customer information efficiently with BlueFolder.
+- [Billing Batch QuickBooks Guide](https://support.bluefolder.com/hc/en-us/articles/202159075-How-to-Create-a-Billing-Batch-and-Transfer-to-QuickBooks): Learn to create and transfer billing batches to QuickBooks.
+- [Personal Dashboard Overview](https://support.bluefolder.com/hc/en-us/articles/202159255-Personal-Dashboard): Access your schedule and assigned work efficiently here.
+- [Import Equipment Records](https://support.bluefolder.com/hc/en-us/articles/202159275-How-to-import-equipment-assets-records): Learn how to import equipment asset records easily.
+- [Equipment Asset Management](https://support.bluefolder.com/hc/en-us/articles/202159285-Overview-Equipment-Assets): Track and manage customer equipment and service history effectively.
+- [Reports Overview](https://support.bluefolder.com/hc/en-us/articles/202159315-Reports-Overview): Access and customize reports for key service data.
+- [Work Orders Overview](https://support.bluefolder.com/hc/en-us/articles/202159335-Work-Orders-Overview): Learn how to track service jobs with work orders.
+- [Work Order List Guide](https://support.bluefolder.com/hc/en-us/articles/202159345-Viewing-and-Searching-the-Work-Order-List): Learn to view and search your work order list.
+- [Account Management Tools](https://support.bluefolder.com/hc/en-us/articles/202159355-Account-Information): Manage your BlueFolder account and subscription details here.
+- [User Profile Management](https://support.bluefolder.com/hc/en-us/articles/202159385-Profile): Manage your account settings, notifications, and calendar sync.
+- [Customer Notifications Overview](https://support.bluefolder.com/hc/en-us/articles/202159705-Customer-Notifications): Learn how to customize customer email notifications effectively.
+- [Customize Customer Records](https://support.bluefolder.com/hc/en-us/articles/202159715-Customize-Customer-Records): Learn to customize customer records for better data management.
+- [Customize Equipment Assets](https://support.bluefolder.com/hc/en-us/articles/202159725-Customize-Your-Equipment-Assets): Learn to customize fields for tracking equipment records.
+- [Customize Value Lists](https://support.bluefolder.com/hc/en-us/articles/202159735-Customize-Your-Value-Lists): Learn to customize various value lists in BlueFolder.
+- [User Permissions Overview](https://support.bluefolder.com/hc/en-us/articles/202159765-User-Permissions): Learn about user roles and permissions in BlueFolder.
+- [User Roles Overview](https://support.bluefolder.com/hc/en-us/articles/202159785-User-Roles): Explore various user roles and their permissions in BlueFolder.
+- [User Roles and Permissions](https://support.bluefolder.com/hc/en-us/articles/202159795-User-Roles-Permissions-Groups): Explore user roles, permissions, and group management in BlueFolder.
+- [Excel to CSV Conversion](https://support.bluefolder.com/hc/en-us/articles/202175615-Converting-an-Excel-File-to-a-Comma-Delimited-csv-File): Learn to convert Excel files to comma-delimited CSV format.
+- [Tax Codes Integration](https://support.bluefolder.com/hc/en-us/articles/202349105-Tax-Codes-and-QuickBooks): Ensure BlueFolder tax codes align with QuickBooks settings.
+- [BlueFolder API Overview](https://support.bluefolder.com/hc/en-us/articles/202884739-API-2-0-Overview): Learn how to use BlueFolder API for integration.
+- [Contracts API Guide](https://support.bluefolder.com/hc/en-us/articles/202885539-Contracts-API): Learn how to retrieve contracts using the API.
+- [Customer Locations API](https://support.bluefolder.com/hc/en-us/articles/202885549-Customer-Locations-API): Manage customer locations with Bluefolder's API documentation.
+- [Service Request Expenses API](https://support.bluefolder.com/hc/en-us/articles/202885559-Expenses-on-Service-Requests-API): Guide for adding and editing expense items via API.
+- [Item List API Guide](https://support.bluefolder.com/hc/en-us/articles/202885569-Item-List-API): Detailed instructions for managing items via API.
+- [Service Requests API](https://support.bluefolder.com/hc/en-us/articles/202885579-Service-Requests-API): Guide to adding service requests via API integration.
+- [Track Equipment Maintenance](https://support.bluefolder.com/hc/en-us/articles/203287149-How-to-Track-Scheduled-Maintenance-for-Equipment): Learn to track scheduled maintenance for your equipment.
+- [Import Equipment Items](https://support.bluefolder.com/hc/en-us/articles/203287379-How-to-Import-Equipment-Assets-Items): Step-by-step guide to import equipment asset items.
+- [Custom Report Creation](https://support.bluefolder.com/hc/en-us/articles/203287409-How-to-Create-a-Custom-Report): Step-by-step guide to creating custom reports easily.
+- [December 2014 Release Notes](https://support.bluefolder.com/hc/en-us/articles/203308949-Release-Notes-2014-12-15): Overview of new features and fixes from December 2014.
+- [October 2014 Release Notes](https://support.bluefolder.com/hc/en-us/articles/203308979-Release-Notes-2014-10-30): New features and fixes for Bluefolder's October 2014 update.
+- [BlueFolder Mobile Release Notes](https://support.bluefolder.com/hc/en-us/articles/203309429-Release-Notes-2011-09-26): Highlights of new features and improvements in BlueFolder mobile.
+- [August 2014 Release Notes](https://support.bluefolder.com/hc/en-us/articles/203310099-Release-Notes-2014-08-01): Details on new features and fixes from August 2014.
+- [Release Notes March 2013](https://support.bluefolder.com/hc/en-us/articles/203310319-Release-Notes-2013-03-22): Updates and fixes for Bluefolder API and mobile app.
+- [Release Notes September 2014](https://support.bluefolder.com/hc/en-us/articles/203313129-Release-Notes-2014-09-07): Overview of updates and fixes from September 2014 release.
+- [Release Notes January 2015](https://support.bluefolder.com/hc/en-us/articles/203313349-Release-Notes-2015-01-12): Updates and fixes for Bluefolder's January 2015 release.
+- [BlueFolder System Status](https://support.bluefolder.com/hc/en-us/articles/203314449-BlueFolder-System-Status-Website): Check real-time status of BlueFolder apps and websites.
+- [Export Outlook Contacts](https://support.bluefolder.com/hc/en-us/articles/203411609-How-to-Export-Contact-Data-from-Outlook): Follow steps to export contact data from Outlook.
+- [Export Customer Data](https://support.bluefolder.com/hc/en-us/articles/203411629-How-to-Export-Customer-Data-from-QuickBooks): Steps to export customer data from QuickBooks easily.
+- [Export Data from BlueFolder](https://support.bluefolder.com/hc/en-us/articles/203411899-How-to-Export-Data-from-BlueFolder): Learn how to export data from BlueFolder easily.
+- [Assignments API Guide](https://support.bluefolder.com/hc/en-us/articles/203611485-Assignments-API): Learn to add, edit, and complete assignments via API.
+- [Customer Contacts API](https://support.bluefolder.com/hc/en-us/articles/203611795-Customer-Contacts-API): Guide for adding, editing, and retrieving customer contacts.
+- [Customers API Guide](https://support.bluefolder.com/hc/en-us/articles/203611805-Customers-API): Instructions for adding customers via Bluefolder API.
+- [Equipment API Guide](https://support.bluefolder.com/hc/en-us/articles/203611815-Equipment-API): Instructions for adding and editing equipment items.
+- [Service Requests API Labor](https://support.bluefolder.com/hc/en-us/articles/203611845-Labor-for-Service-Requests-API): Guide for adding and editing labor in service requests
+- [Service Requests API Materials](https://support.bluefolder.com/hc/en-us/articles/203611855-Materials-for-Service-Requests-API): Guide for adding and editing material items in API
+- [Tax Codes API Guide](https://support.bluefolder.com/hc/en-us/articles/203611875-Tax-Codes-API): Learn how to retrieve tax codes using the API.
+- [Users API Overview](https://support.bluefolder.com/hc/en-us/articles/203611885-Users-API): Guide for adding and editing users via API.
+- [BlueFolder Webinar Overview](https://support.bluefolder.com/hc/en-us/articles/203728179-Pre-recorded-Webinar-Intro-to-Bluefolder): Learn how BlueFolder streamlines your business operations effectively.
+- [Customize Customer Notifications](https://support.bluefolder.com/hc/en-us/articles/203749555-Customize-Customer-Notifications): Learn to configure customer email notifications in BlueFolder.
+- [Billing Settings Customization](https://support.bluefolder.com/hc/en-us/articles/203760679-Customize-Billing-Settings): Learn to customize billing information for your accounting system.
+- [Billing Batch Options](https://support.bluefolder.com/hc/en-us/articles/203822739-Billing-Batch-Options-Overview): Overview of billing batch options for accounting integration.
+- [Getting Started with Contracts](https://support.bluefolder.com/hc/en-us/articles/203823879-Video-Getting-started-with-BlueFolder-Contracts): Learn to navigate BlueFolder contracts with this video guide.
+- [Getting Started with BlueFolder](https://support.bluefolder.com/hc/en-us/articles/203823929-Video-Getting-started-with-BlueFolder-Equipment-Asset-Tracking): Learn to track equipment and assets using BlueFolder.
+- [BlueFolder Customer Portal Guide](https://support.bluefolder.com/hc/en-us/articles/203823959-Video-Getting-started-with-BlueFolder-s-Customer-Portal): Learn to navigate BlueFolder's Customer Portal effectively.
+- [Reopen Closed Work Order](https://support.bluefolder.com/hc/en-us/articles/203855989-Reopening-a-Closed-Work-Order): Instructions for reopening a closed work order easily.
+- [Assign Work Orders](https://support.bluefolder.com/hc/en-us/articles/203872929-Assigning-Work-Orders): Learn how to assign work orders to technicians efficiently.
+- [Recover Deleted Work Orders](https://support.bluefolder.com/hc/en-us/articles/203875669-Recovering-a-Deleted-Work-Order): Easily restore deleted work orders in BlueFolder.
+- [Clone Work Orders Easily](https://support.bluefolder.com/hc/en-us/articles/203875679-Cloning-a-Work-Order): Learn to quickly duplicate work orders in BlueFolder.
+- [Work Order Communication](https://support.bluefolder.com/hc/en-us/articles/203876169-Communicating-with-Your-Technicians-and-Customers-via-Work-Order-Comments-and-Email): Learn to communicate via email with technicians and customers.
+- [Incoming Email Management](https://support.bluefolder.com/hc/en-us/articles/203876569-Incoming-Email-How-does-BlueFolder-Handle-Incoming-Email): Learn how BlueFolder processes incoming emails effectively.
+- [Email Notifications Setup](https://support.bluefolder.com/hc/en-us/articles/203876579-Outgoing-Email-Sending-Notifications-to-Your-Customers): Configure customer notifications for work order events easily.
+- [Release Notes March 2015](https://support.bluefolder.com/hc/en-us/articles/203913189-Release-Notes-2015-03-18): Updates and fixes for BlueFolder released on March 18, 2015.
+- [Service Dashboard Overview](https://support.bluefolder.com/hc/en-us/articles/203999365-Service-Dashboard): Quick snapshot for business owners using BlueFolder dashboard.
+- [Release Notes April 2012](https://support.bluefolder.com/hc/en-us/articles/204023505-Release-Notes-2012-04-20): Summary of new features and improvements in April 2012.
+- [Release Notes 2012](https://support.bluefolder.com/hc/en-us/articles/204025125-Release-Notes-2012-10-15): Updates and bug fixes for Bluefolder's October 2012 release.
+- [Release Notes August 2012](https://support.bluefolder.com/hc/en-us/articles/204025175-Release-Notes-2012-08-17): Overview of new features and bug fixes for August 2012.
+- [December 2012 Release Notes](https://support.bluefolder.com/hc/en-us/articles/204025435-Release-Notes-2012-12-06): Overview of new features and fixes in BlueFolder update.
+- [February 2013 Release Notes](https://support.bluefolder.com/hc/en-us/articles/204025515-Release-Notes-2013-02-08): Updates and fixes from Bluefolder's February 2013 release.
+- [Release Notes July 2013](https://support.bluefolder.com/hc/en-us/articles/204026185-Release-Notes-2013-07-15): Details on new features and updates from July 2013.
+- [Release Notes December 2014](https://support.bluefolder.com/hc/en-us/articles/204026205-Release-Notes-2014-12-19): Details on fixes and updates from December 2014 release.
+- [November 2014 Release Notes](https://support.bluefolder.com/hc/en-us/articles/204026295-Release-Notes-2014-11-11): Overview of fixes and updates from November 2014 release.
+- [Export QuickBooks Item Data](https://support.bluefolder.com/hc/en-us/articles/204132325-How-to-Export-Item-Data-from-QuickBooks): Step-by-step guide to export item data from QuickBooks.
