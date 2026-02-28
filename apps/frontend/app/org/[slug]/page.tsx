@@ -1,18 +1,17 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { OrgDashboardContent } from './components/org-dashboard-content';
 
-export default async function OrgDashboard({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function DashboardPage() {
   const { userId } = await auth();
-  const { slug } = await params;
 
   if (!userId) {
     redirect('/sign-in');
   }
 
-  return <OrgDashboardContent slug={slug} />;
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      <p className="mt-2 text-muted-foreground">Coming soon.</p>
+    </div>
+  );
 }

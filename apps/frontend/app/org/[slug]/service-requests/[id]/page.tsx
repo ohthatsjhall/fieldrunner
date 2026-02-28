@@ -472,10 +472,10 @@ export default function ServiceRequestDetailPage() {
     return (
       <div className="space-y-4">
         <Link
-          href={`/org/${params.slug}`}
+          href={`/org/${params.slug}/requests`}
           className="text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
-          Back to Dashboard
+          Back to Requests
         </Link>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
           <p className="text-sm text-red-700 dark:text-red-400">{error || 'Service request not found'}</p>
@@ -499,10 +499,10 @@ export default function ServiceRequestDetailPage() {
     <div className="space-y-6">
       <div>
         <Link
-          href={`/org/${params.slug}`}
+          href={`/org/${params.slug}/requests`}
           className="text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
-          Back to Dashboard
+          Back to Requests
         </Link>
         <div className="mt-2 flex items-center gap-3">
           <h1 className="text-2xl font-bold">SR #{sr.serviceRequestId}</h1>
