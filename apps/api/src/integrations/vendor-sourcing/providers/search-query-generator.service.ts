@@ -17,6 +17,7 @@ Rules:
 - Include trade-specific terms a real contractor would use
 - Return 2-3 queries ordered from most specific to broadest
 - Also return the best-fit trade category for organizing this vendor
+- Strip urgency/priority language from queries. Words like 'emergency', 'urgent', 'critical', 'immediate', 'ASAP', '24-hour', 'same-day' bias Google Places results toward expensive emergency services rather than the best-fit contractor for the actual trade work.
 
 Respond with ONLY valid JSON in this exact format:
 {

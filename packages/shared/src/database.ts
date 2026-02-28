@@ -249,6 +249,7 @@ export type VendorSearchResult = {
   reviewCountScore: string | null;
   categoryMatchScore: string | null;
   businessHoursScore: string | null;
+  credentialScore: string | null;
   distanceMeters: string | null;
   createdAt: Date;
 };

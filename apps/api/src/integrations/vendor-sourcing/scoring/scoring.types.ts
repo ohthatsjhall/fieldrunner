@@ -4,10 +4,29 @@ export type ScoringWeights = {
   reviewCount: number;
   categoryMatch: number;
   businessHours: number;
+  credential: number;
 };
 
 export type CategoryMatchLevel = 'exact' | 'related' | 'fuzzy' | 'none';
 export type BusinessHoursStatus = 'open' | 'closing_soon' | 'unknown' | 'closed';
+
+export type CredentialSignals = {
+  hasActiveLicense: boolean | null;
+  licenseCount: number;
+  bzScore: number | null;
+  isInsured: boolean | null;
+  permitCount: number | null;
+  recentPermitCount: number | null;
+};
+
+export const EMPTY_CREDENTIALS: CredentialSignals = {
+  hasActiveLicense: null,
+  licenseCount: 0,
+  bzScore: null,
+  isInsured: null,
+  permitCount: null,
+  recentPermitCount: null,
+};
 
 export type ScoringInput = {
   distanceMeters: number | null;
@@ -15,6 +34,7 @@ export type ScoringInput = {
   reviewCount: number | null;
   categoryMatch: CategoryMatchLevel;
   businessHoursStatus: BusinessHoursStatus;
+  credentialSignals: CredentialSignals;
 };
 
 export type ScoredResult = {
@@ -24,12 +44,14 @@ export type ScoredResult = {
   reviewCountScore: number;
   categoryMatchScore: number;
   businessHoursScore: number;
+  credentialScore: number;
 };
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-  distance: 0.35,
-  rating: 0.30,
-  reviewCount: 0.15,
-  categoryMatch: 0.15,
+  distance: 0.30,
+  rating: 0.25,
+  reviewCount: 0.10,
+  categoryMatch: 0.10,
   businessHours: 0.05,
+  credential: 0.20,
 };

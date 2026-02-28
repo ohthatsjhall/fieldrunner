@@ -12,15 +12,22 @@ import { BlueFolderService } from '../bluefolder/bluefolder.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { NominatimProvider } from './providers/nominatim.provider';
 import { GooglePlacesProvider } from './providers/google-places.provider';
+import { BuildZoomProvider } from './providers/buildzoom.provider';
 import { SearchQueryGeneratorService } from './providers/search-query-generator.service';
 import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { normalizePhone } from './mappers';
 import type { NormalizedPlace } from './providers/provider.interface';
-import type { ScoringInput, ScoredResult } from './scoring/scoring.types';
+import type {
+  ScoringInput,
+  ScoredResult,
+  CredentialSignals,
+} from './scoring/scoring.types';
+import { EMPTY_CREDENTIALS } from './scoring/scoring.types';
 import type { VendorSearchResponse, VendorCandidate } from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../core/database/schema';
+import type { BuildZoomContractor } from './types/buildzoom-api.types';
 
 type SearchParams = {
   serviceRequestBluefolderId?: number;
@@ -41,6 +48,7 @@ export class VendorSourcingService {
     private readonly settingsService: OrganizationSettingsService,
     private readonly nominatim: NominatimProvider,
     private readonly googlePlaces: GooglePlacesProvider,
+    private readonly buildZoom: BuildZoomProvider,
     private readonly queryGenerator: SearchQueryGeneratorService,
     private readonly scoring: VendorScoringService,
     private readonly tradeCategoriesService: TradeCategoriesService,
@@ -124,6 +132,9 @@ export class VendorSourcingService {
       };
     }
 
+    // Derive a human-readable location name for BuildZoom
+    const locationName = this.deriveLocationName(address);
+
     // 3. Create search session
     const [session] = await this.db
       .insert(vendorSearchSessions)
@@ -142,34 +153,60 @@ export class VendorSourcingService {
       .returning();
 
     try {
-      // 4. Run each search query and collect all places (deduplicated)
-      const allPlaces: NormalizedPlace[] = [];
-      const seenSourceIds = new Set<string>();
+      // 4. Run Google Places and BuildZoom in parallel
       const sourceCounts: Record<string, number> = {};
 
-      for (const query of searchQueries) {
-        const places = await this.googlePlaces.search({
-          query,
-          latitude: geocoded.latitude,
-          longitude: geocoded.longitude,
-          radiusMeters,
-        });
+      const [googleResult, buildZoomResult] = await Promise.allSettled([
+        this.searchGoogle(searchQueries, geocoded, radiusMeters, sourceCounts),
+        this.searchBuildZoom(primaryQuery, geocoded, radiusMeters, locationName),
+      ]);
 
-        sourceCounts[`google_places:${query}`] = places.length;
+      // Collect Google results
+      const allPlaces: NormalizedPlace[] = [];
+      const seenPhones = new Set<string>();
 
-        for (const p of places) {
-          if (!seenSourceIds.has(p.sourceId)) {
-            seenSourceIds.add(p.sourceId);
-            allPlaces.push(p);
-          }
+      if (googleResult.status === 'fulfilled') {
+        for (const p of googleResult.value) {
+          allPlaces.push(p);
+          const norm = normalizePhone(p.phone);
+          if (norm) seenPhones.add(norm);
         }
+      } else {
+        this.logger.error('Google Places search failed', googleResult.reason);
+      }
+
+      // Collect BuildZoom results (dedup by phone, geocode missing coords)
+      if (buildZoomResult.status === 'fulfilled' && buildZoomResult.value.length > 0) {
+        const bzPlaces = buildZoomResult.value;
+        sourceCounts['buildzoom'] = bzPlaces.length;
+
+        for (const p of bzPlaces) {
+          const norm = normalizePhone(p.phone);
+          if (norm && seenPhones.has(norm)) {
+            this.logger.log(`Cross-source dedup: ${p.name} (phone ${norm})`);
+            continue;
+          }
+
+          // Geocode BuildZoom results (they lack lat/lon)
+          if (p.latitude === null && p.longitude === null && p.address) {
+            const geo = await this.nominatim.geocode(p.address);
+            if (geo) {
+              p.latitude = geo.latitude;
+              p.longitude = geo.longitude;
+            }
+          }
+
+          allPlaces.push(p);
+          if (norm) seenPhones.add(norm);
+        }
+      } else if (buildZoomResult.status === 'rejected') {
+        this.logger.warn('BuildZoom search failed', buildZoomResult.reason);
       }
 
       // 5. Deduplicate and upsert vendors
       const vendorIds = await this.upsertVendors(organizationId, allPlaces);
 
-      // 6. Score and rank — Claude already matched the right trade,
-      // so we use 'exact' category match for all results
+      // 6. Score and rank
       const scoringInputs = allPlaces.map((p, i) => ({
         id: vendorIds[i],
         input: this.buildScoringInput(
@@ -212,6 +249,7 @@ export class VendorSourcingService {
               reviewCountScore: String(r.scored.reviewCountScore),
               categoryMatchScore: String(r.scored.categoryMatchScore),
               businessHoursScore: String(r.scored.businessHoursScore),
+              credentialScore: String(r.scored.credentialScore),
               distanceMeters:
                 distMeters !== null ? String(distMeters.toFixed(2)) : null,
             };
@@ -276,6 +314,53 @@ export class VendorSourcingService {
         candidates: [],
       };
     }
+  }
+
+  private async searchGoogle(
+    queries: string[],
+    geocoded: { latitude: number; longitude: number },
+    radiusMeters: number,
+    sourceCounts: Record<string, number>,
+  ): Promise<NormalizedPlace[]> {
+    const allPlaces: NormalizedPlace[] = [];
+    const seenSourceIds = new Set<string>();
+
+    for (const query of queries) {
+      const places = await this.googlePlaces.search({
+        query,
+        latitude: geocoded.latitude,
+        longitude: geocoded.longitude,
+        radiusMeters,
+      });
+
+      sourceCounts[`google_places:${query}`] = places.length;
+
+      for (const p of places) {
+        if (!seenSourceIds.has(p.sourceId)) {
+          seenSourceIds.add(p.sourceId);
+          allPlaces.push(p);
+        }
+      }
+    }
+
+    return allPlaces;
+  }
+
+  private async searchBuildZoom(
+    query: string,
+    geocoded: { latitude: number; longitude: number },
+    radiusMeters: number,
+    locationName: string,
+  ): Promise<NormalizedPlace[]> {
+    if (!this.buildZoom.isEnabled) return [];
+
+    return this.buildZoom.search({
+      query,
+      latitude: geocoded.latitude,
+      longitude: geocoded.longitude,
+      radiusMeters,
+      locationName,
+    });
   }
 
   async getSession(organizationId: string, sessionId: string) {
@@ -373,7 +458,8 @@ export class VendorSourcingService {
             rating: p.rating !== null ? String(p.rating) : null,
             reviewCount: p.reviewCount,
             website: p.website,
-            googlePlaceId: p.sourceId,
+            googlePlaceId:
+              p.source === 'google_places' ? p.sourceId : undefined,
             lastSeenAt: new Date(),
             updatedAt: new Date(),
           })
@@ -395,7 +481,8 @@ export class VendorSourcingService {
             latitude: p.latitude !== null ? String(p.latitude) : null,
             longitude: p.longitude !== null ? String(p.longitude) : null,
             website: p.website,
-            googlePlaceId: p.sourceId,
+            googlePlaceId:
+              p.source === 'google_places' ? p.sourceId : null,
             rating: p.rating !== null ? String(p.rating) : null,
             reviewCount: p.reviewCount,
             categories: p.types,
@@ -444,6 +531,25 @@ export class VendorSourcingService {
       reviewCount: p.reviewCount,
       categoryMatch: 'exact', // Claude already selected the right trade
       businessHoursStatus: this.resolveBusinessHours(p.businessHours),
+      credentialSignals: this.extractCredentialSignals(p),
+    };
+  }
+
+  private extractCredentialSignals(p: NormalizedPlace): CredentialSignals {
+    if (p.source !== 'buildzoom') return EMPTY_CREDENTIALS;
+
+    const raw = p.rawData as unknown as BuildZoomContractor;
+    const licenses = raw.licenses ?? [];
+
+    return {
+      hasActiveLicense: licenses.length > 0
+        ? licenses.some((l) => l.licenseStatus === 'Active')
+        : null,
+      licenseCount: licenses.length,
+      bzScore: raw.bzScore ? parseInt(raw.bzScore, 10) || null : null,
+      isInsured: raw.insurer != null ? true : null,
+      permitCount: raw.totalPermittedProjects ?? null,
+      recentPermitCount: raw.totalProjectsLastXYears ?? null,
     };
   }
 
@@ -454,6 +560,18 @@ export class VendorSourcingService {
     if (hours.openNow === true) return 'open';
     if (hours.openNow === false) return 'closed';
     return 'unknown';
+  }
+
+  private deriveLocationName(address: string): string {
+    // Extract "City, ST" from a full address like "123 Main St, Pittsburgh, PA, 15201"
+    const parts = address.split(',').map((s) => s.trim());
+    if (parts.length >= 3) {
+      return `${parts[parts.length - 3]}, ${parts[parts.length - 2]}`;
+    }
+    if (parts.length >= 2) {
+      return `${parts[0]}, ${parts[1]}`;
+    }
+    return address;
   }
 
   private haversine(
@@ -520,13 +638,16 @@ export class VendorSourcingService {
         reviewCount: p?.reviewCount ?? null,
         distanceMeters,
         categories: p?.types ?? null,
-        googlePlaceId: p?.sourceId ?? null,
+        googlePlaceId:
+          p?.source === 'google_places' ? p.sourceId : null,
+        sources: p ? [p.source] : [],
         scores: {
           distance: r.scored.distanceScore,
           rating: r.scored.ratingScore,
           reviewCount: r.scored.reviewCountScore,
           categoryMatch: r.scored.categoryMatchScore,
           businessHours: r.scored.businessHoursScore,
+          credential: r.scored.credentialScore,
         },
       };
     });

@@ -5,11 +5,13 @@ import { BlueFolderService } from '../bluefolder/bluefolder.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { NominatimProvider } from './providers/nominatim.provider';
 import { GooglePlacesProvider } from './providers/google-places.provider';
+import { BuildZoomProvider } from './providers/buildzoom.provider';
 import { SearchQueryGeneratorService } from './providers/search-query-generator.service';
 import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
+import type { NormalizedPlace } from './providers/provider.interface';
 
 function makeSrDetail(
   overrides: Partial<ServiceRequestDetail> = {},
@@ -67,12 +69,84 @@ function makeSrDetail(
   };
 }
 
+function makeGooglePlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace {
+  return {
+    sourceId: 'ChIJ_test1',
+    source: 'google_places',
+    name: 'Best Plumber',
+    phone: '+1 512-555-0001',
+    address: '100 Test St, Austin, TX',
+    streetAddress: '100 Test St',
+    city: 'Austin',
+    state: 'TX',
+    postalCode: '78701',
+    country: 'US',
+    latitude: 30.27,
+    longitude: -97.74,
+    website: 'https://bestplumber.com',
+    rating: 4.8,
+    reviewCount: 200,
+    types: ['plumber'],
+    businessHours: { openNow: true },
+    rawData: {},
+    ...overrides,
+  };
+}
+
+function makeBzPlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace {
+  return {
+    sourceId: 'https://www.buildzoom.com/contractor/bz-plumbing',
+    source: 'buildzoom',
+    name: 'BZ Plumbing',
+    phone: '(512) 555-9999',
+    address: '300 Elm St, Austin, TX 78703',
+    streetAddress: null,
+    city: 'Austin',
+    state: 'TX',
+    postalCode: null,
+    country: 'US',
+    latitude: null,
+    longitude: null,
+    website: null,
+    rating: null,
+    reviewCount: 3,
+    types: ['Plumbing'],
+    businessHours: null,
+    rawData: {
+      url: 'https://www.buildzoom.com/contractor/bz-plumbing',
+      contractorName: 'BZ Plumbing',
+      phoneNumber: '(512) 555-9999',
+      location: 'Austin, TX',
+      fullAddress: '300 Elm St, Austin, TX 78703',
+      bzScore: '130',
+      totalProjectsLastXYears: 20,
+      totalPermittedProjects: 60,
+      insurer: 'State Farm',
+      reviewsCount: 3,
+      servicesOffered: ['Plumbing'],
+      licenses: [
+        {
+          licenseNumber: 'TX-111',
+          licenseStatus: 'Active',
+          licenseCity: 'Austin',
+          licenseType: 'Plumber',
+          licenseBusinessType: 'LLC',
+          licenseVerificationDate: 'Jan 2026',
+          licenseVerificationLink: '',
+        },
+      ],
+    },
+    ...overrides,
+  };
+}
+
 describe('VendorSourcingService', () => {
   let service: VendorSourcingService;
   let mockBlueFolderService: jest.Mocked<BlueFolderService>;
   let mockSettings: jest.Mocked<OrganizationSettingsService>;
   let mockNominatim: jest.Mocked<NominatimProvider>;
   let mockGooglePlaces: jest.Mocked<GooglePlacesProvider>;
+  let mockBuildZoom: jest.Mocked<BuildZoomProvider>;
   let mockQueryGenerator: jest.Mocked<SearchQueryGeneratorService>;
   let mockScoring: VendorScoringService;
   let mockTradeCategories: jest.Mocked<TradeCategoriesService>;
@@ -101,37 +175,14 @@ describe('VendorSourcingService', () => {
     mockGooglePlaces = {
       name: 'google_places',
       search: jest.fn().mockResolvedValue([
-        {
-          sourceId: 'ChIJ_test1',
-          source: 'google_places',
-          name: 'Best Plumber',
-          phone: '+1 512-555-0001',
-          address: '100 Test St, Austin, TX',
-          streetAddress: '100 Test St',
-          city: 'Austin',
-          state: 'TX',
-          postalCode: '78701',
-          country: 'US',
-          latitude: 30.27,
-          longitude: -97.74,
-          website: 'https://bestplumber.com',
-          rating: 4.8,
-          reviewCount: 200,
-          types: ['plumber'],
-          businessHours: { openNow: true },
-          rawData: {},
-        },
-        {
+        makeGooglePlace(),
+        makeGooglePlace({
           sourceId: 'ChIJ_test2',
-          source: 'google_places',
           name: 'Quick Fix',
           phone: '+1 512-555-0002',
           address: '200 Oak Ave, Austin, TX',
           streetAddress: '200 Oak Ave',
-          city: 'Austin',
-          state: 'TX',
           postalCode: '78702',
-          country: 'US',
           latitude: 30.28,
           longitude: -97.75,
           website: null,
@@ -139,10 +190,15 @@ describe('VendorSourcingService', () => {
           reviewCount: 50,
           types: ['plumber', 'establishment'],
           businessHours: null,
-          rawData: {},
-        },
+        }),
       ]),
     } as unknown as jest.Mocked<GooglePlacesProvider>;
+
+    mockBuildZoom = {
+      name: 'buildzoom',
+      isEnabled: true,
+      search: jest.fn().mockResolvedValue([makeBzPlace()]),
+    } as unknown as jest.Mocked<BuildZoomProvider>;
 
     mockQueryGenerator = {
       generateSearchQueries: jest.fn().mockResolvedValue({
@@ -184,6 +240,7 @@ describe('VendorSourcingService', () => {
         { provide: OrganizationSettingsService, useValue: mockSettings },
         { provide: NominatimProvider, useValue: mockNominatim },
         { provide: GooglePlacesProvider, useValue: mockGooglePlaces },
+        { provide: BuildZoomProvider, useValue: mockBuildZoom },
         { provide: SearchQueryGeneratorService, useValue: mockQueryGenerator },
         { provide: VendorScoringService, useValue: mockScoring },
         { provide: TradeCategoriesService, useValue: mockTradeCategories },
@@ -280,6 +337,80 @@ describe('VendorSourcingService', () => {
       expect(mockTradeCategories.seedDefaults).toHaveBeenCalledWith(
         internalOrgId,
       );
+    });
+  });
+
+  describe('parallel search (Google + BuildZoom)', () => {
+    it('should call both providers in parallel', async () => {
+      await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(mockGooglePlaces.search).toHaveBeenCalled();
+      expect(mockBuildZoom.search).toHaveBeenCalled();
+    });
+
+    it('should geocode BuildZoom results lacking coordinates', async () => {
+      await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      // First call: address geocoding, Second+: BZ result geocoding
+      const geocodeCalls = mockNominatim.geocode.mock.calls;
+      const bzGeocode = geocodeCalls.find((c) =>
+        c[0]?.includes('300 Elm St'),
+      );
+      expect(bzGeocode).toBeDefined();
+    });
+
+    it('should deduplicate across sources by phone', async () => {
+      // BZ returns same phone as Google result — should be skipped
+      mockBuildZoom.search.mockResolvedValue([
+        makeBzPlace({ phone: '+1 512-555-0001' }), // same as Google's Best Plumber
+      ]);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      // BZ vendor should be deduped out since phone matches Google result
+      // Only Google results should remain (2 vendors)
+      expect(result.status).toBe('completed');
+      const names = result.candidates.map((c) => c.name);
+      expect(names).not.toContain('BZ Plumbing');
+    });
+
+    it('should continue with Google-only when BuildZoom fails', async () => {
+      mockBuildZoom.search.mockRejectedValue(new Error('BZ timeout'));
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.candidates.length).toBeGreaterThan(0);
+    });
+
+    it('should continue with Google-only when BuildZoom is disabled', async () => {
+      mockBuildZoom.isEnabled = false;
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.candidates.length).toBeGreaterThan(0);
+    });
+
+    it('should include credential scores in candidate response', async () => {
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      for (const c of result.candidates) {
+        expect(c.scores.credential).toBeDefined();
+        expect(typeof c.scores.credential).toBe('number');
+      }
     });
   });
 });

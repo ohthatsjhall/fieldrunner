@@ -3,6 +3,7 @@ export type PlaceSearchParams = {
   latitude: number;
   longitude: number;
   radiusMeters: number;
+  locationName?: string;
 };
 
 export type NormalizedPlace = {

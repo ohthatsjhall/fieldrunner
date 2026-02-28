@@ -33,6 +33,7 @@ export const vendorSearchResults = pgTable(
       precision: 5,
       scale: 2,
     }),
+    credentialScore: decimal('credential_score', { precision: 5, scale: 2 }),
     distanceMeters: decimal('distance_meters', { precision: 10, scale: 2 }),
     createdAt: timestamp('created_at', {
       withTimezone: true,

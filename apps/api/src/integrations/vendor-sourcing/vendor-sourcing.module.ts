@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { VendorSourcingController } from './vendor-sourcing.controller';
 import { VendorSourcingService } from './vendor-sourcing.service';
 import { GooglePlacesProvider } from './providers/google-places.provider';
+import { BuildZoomProvider } from './providers/buildzoom.provider';
 import { NominatimProvider } from './providers/nominatim.provider';
 import { SearchQueryGeneratorService } from './providers/search-query-generator.service';
 import { VendorScoringService } from './scoring/vendor-scoring.service';
@@ -15,6 +16,7 @@ import { BlueFolderModule } from '../bluefolder/bluefolder.module';
   providers: [
     VendorSourcingService,
     GooglePlacesProvider,
+    BuildZoomProvider,
     NominatimProvider,
     SearchQueryGeneratorService,
     VendorScoringService,

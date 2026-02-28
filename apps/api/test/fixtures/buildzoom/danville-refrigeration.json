@@ -1,0 +1,6 @@
+{
+  "error": {
+    "type": "actor-memory-limit-exceeded",
+    "message": "By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds (currently used: 8192MB, requested: 4096MB). Please consider an upgrade to a paid plan at https://console.apify.com/billing/subscription to increase your Actor memory limit."
+  }
+}

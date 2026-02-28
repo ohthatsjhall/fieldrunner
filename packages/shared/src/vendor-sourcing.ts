@@ -12,12 +12,14 @@ export type VendorCandidate = {
   distanceMeters: number | null;
   categories: string[] | null;
   googlePlaceId: string | null;
+  sources?: string[];
   scores: {
     distance: number | null;
     rating: number | null;
     reviewCount: number | null;
     categoryMatch: number | null;
     businessHours: number | null;
+    credential: number | null;
   };
 };
 

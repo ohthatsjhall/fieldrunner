@@ -4,8 +4,9 @@ import type {
   ScoringWeights,
   CategoryMatchLevel,
   BusinessHoursStatus,
+  CredentialSignals,
 } from './scoring.types';
-import { DEFAULT_WEIGHTS } from './scoring.types';
+import { DEFAULT_WEIGHTS, EMPTY_CREDENTIALS } from './scoring.types';
 
 describe('VendorScoringService', () => {
   let service: VendorScoringService;
@@ -21,8 +22,15 @@ describe('VendorScoringService', () => {
       reviewCount: 50,
       categoryMatch: 'exact',
       businessHoursStatus: 'open',
+      credentialSignals: EMPTY_CREDENTIALS,
       ...overrides,
     };
+  }
+
+  function makeCredentials(
+    overrides: Partial<CredentialSignals> = {},
+  ): CredentialSignals {
+    return { ...EMPTY_CREDENTIALS, ...overrides };
   }
 
   describe('score', () => {
@@ -44,6 +52,8 @@ describe('VendorScoringService', () => {
       expect(result.categoryMatchScore).toBeLessThanOrEqual(100);
       expect(result.businessHoursScore).toBeGreaterThanOrEqual(0);
       expect(result.businessHoursScore).toBeLessThanOrEqual(100);
+      expect(result.credentialScore).toBeGreaterThanOrEqual(0);
+      expect(result.credentialScore).toBeLessThanOrEqual(100);
     });
 
     it('should score a very close vendor higher on distance than a far one', () => {
@@ -70,7 +80,9 @@ describe('VendorScoringService', () => {
     });
 
     it('should handle null rating (regress to prior mean)', () => {
-      const result = service.score(makeInput({ rating: null, reviewCount: null }));
+      const result = service.score(
+        makeInput({ rating: null, reviewCount: null }),
+      );
       expect(result.ratingScore).toBeGreaterThan(0);
     });
 
@@ -90,11 +102,17 @@ describe('VendorScoringService', () => {
     });
 
     it('should score category match levels correctly', () => {
-      const levels: CategoryMatchLevel[] = ['exact', 'related', 'fuzzy', 'none'];
+      const levels: CategoryMatchLevel[] = [
+        'exact',
+        'related',
+        'fuzzy',
+        'none',
+      ];
       const scores = levels.map(
-        (level) => service.score(makeInput({ categoryMatch: level })).categoryMatchScore,
+        (level) =>
+          service.score(makeInput({ categoryMatch: level }))
+            .categoryMatchScore,
       );
-      // exact > related > fuzzy > none
       expect(scores[0]).toBeGreaterThan(scores[1]);
       expect(scores[1]).toBeGreaterThan(scores[2]);
       expect(scores[2]).toBeGreaterThan(scores[3]);
@@ -102,9 +120,16 @@ describe('VendorScoringService', () => {
     });
 
     it('should score business hours correctly', () => {
-      const statuses: BusinessHoursStatus[] = ['open', 'closing_soon', 'unknown', 'closed'];
+      const statuses: BusinessHoursStatus[] = [
+        'open',
+        'closing_soon',
+        'unknown',
+        'closed',
+      ];
       const scores = statuses.map(
-        (s) => service.score(makeInput({ businessHoursStatus: s })).businessHoursScore,
+        (s) =>
+          service.score(makeInput({ businessHoursStatus: s }))
+            .businessHoursScore,
       );
       expect(scores[0]).toBeGreaterThan(scores[1]);
       expect(scores[1]).toBeGreaterThan(scores[2]);
@@ -118,6 +143,7 @@ describe('VendorScoringService', () => {
         reviewCount: 0,
         categoryMatch: 0,
         businessHours: 0,
+        credential: 0,
       };
       const close = service.score(
         makeInput({ distanceMeters: 100 }),
@@ -129,24 +155,156 @@ describe('VendorScoringService', () => {
         40000,
         distanceOnlyWeights,
       );
-      // With only distance weighted, close should score much higher
       expect(close.totalScore).toBeGreaterThan(far.totalScore + 20);
+    });
+  });
+
+  describe('credentialScore', () => {
+    it('should return 0 for empty credential signals', () => {
+      const result = service.calcCredentialScore(EMPTY_CREDENTIALS);
+      expect(result).toBe(0);
+    });
+
+    it('should score active license at 40', () => {
+      const result = service.calcCredentialScore(
+        makeCredentials({ hasActiveLicense: true }),
+      );
+      expect(result).toBeGreaterThanOrEqual(40);
+    });
+
+    it('should score 0 for expired/revoked license', () => {
+      const result = service.calcCredentialScore(
+        makeCredentials({ hasActiveLicense: false }),
+      );
+      expect(result).toBe(0);
+    });
+
+    it('should score multiple licenses (capped at 15)', () => {
+      const two = service.calcCredentialScore(
+        makeCredentials({ licenseCount: 2 }),
+      );
+      const five = service.calcCredentialScore(
+        makeCredentials({ licenseCount: 5 }),
+      );
+      expect(two).toBe(10);
+      expect(five).toBe(15); // capped at 3 * 5 = 15
+    });
+
+    it('should score bzScore on 0-200 scale', () => {
+      const low = service.calcCredentialScore(
+        makeCredentials({ bzScore: 50 }),
+      );
+      const high = service.calcCredentialScore(
+        makeCredentials({ bzScore: 150 }),
+      );
+      const max = service.calcCredentialScore(
+        makeCredentials({ bzScore: 200 }),
+      );
+      expect(high).toBeGreaterThan(low);
+      expect(max).toBe(20); // 200/200 * 20 = 20
+    });
+
+    it('should score insurance at 10', () => {
+      const result = service.calcCredentialScore(
+        makeCredentials({ isInsured: true }),
+      );
+      expect(result).toBe(10);
+    });
+
+    it('should score recent permits on log scale', () => {
+      const few = service.calcCredentialScore(
+        makeCredentials({ recentPermitCount: 5 }),
+      );
+      const many = service.calcCredentialScore(
+        makeCredentials({ recentPermitCount: 50 }),
+      );
+      expect(many).toBeGreaterThan(few);
+      expect(many).toBeLessThanOrEqual(15);
+    });
+
+    it('should cap at 100', () => {
+      const maxed = service.calcCredentialScore({
+        hasActiveLicense: true,   // 40
+        licenseCount: 5,          // 15
+        bzScore: 200,             // 20
+        isInsured: true,          // 10
+        recentPermitCount: 50,    // ~15
+        permitCount: 300,
+      });
+      expect(maxed).toBeLessThanOrEqual(100);
+    });
+
+    it('should weight credential at 0.20 in total score', () => {
+      expect(DEFAULT_WEIGHTS.credential).toBe(0.20);
+    });
+
+    it('BZ vendor with strong credentials should outscore Google vendor with no credentials (comparable distance)', () => {
+      // Google vendor: good rating, no credentials
+      const googleVendor = service.score(makeInput({
+        distanceMeters: 3200,
+        rating: 4.8,
+        reviewCount: 13,
+        categoryMatch: 'exact',
+        businessHoursStatus: 'open',
+        credentialSignals: EMPTY_CREDENTIALS,
+      }));
+
+      // BZ vendor: no rating, strong credentials
+      const bzVendor = service.score(makeInput({
+        distanceMeters: 5800,
+        rating: null,
+        reviewCount: 3,
+        categoryMatch: 'exact',
+        businessHoursStatus: 'unknown',
+        credentialSignals: {
+          hasActiveLicense: true,
+          licenseCount: 2,
+          bzScore: 142,
+          isInsured: true,
+          permitCount: 85,
+          recentPermitCount: 22,
+        },
+      }));
+
+      expect(bzVendor.totalScore).toBeGreaterThan(googleVendor.totalScore);
+      expect(bzVendor.credentialScore).toBeGreaterThan(70);
+      expect(googleVendor.credentialScore).toBe(0);
     });
   });
 
   describe('scoreAndRank', () => {
     it('should rank vendors by totalScore descending', () => {
       const inputs = [
-        { id: 'far', input: makeInput({ distanceMeters: 35000, rating: 3.0, reviewCount: 2 }) },
-        { id: 'close', input: makeInput({ distanceMeters: 1000, rating: 4.8, reviewCount: 300 }) },
-        { id: 'mid', input: makeInput({ distanceMeters: 10000, rating: 4.0, reviewCount: 50 }) },
+        {
+          id: 'far',
+          input: makeInput({
+            distanceMeters: 35000,
+            rating: 3.0,
+            reviewCount: 2,
+          }),
+        },
+        {
+          id: 'close',
+          input: makeInput({
+            distanceMeters: 1000,
+            rating: 4.8,
+            reviewCount: 300,
+          }),
+        },
+        {
+          id: 'mid',
+          input: makeInput({
+            distanceMeters: 10000,
+            rating: 4.0,
+            reviewCount: 50,
+          }),
+        },
       ];
 
       const ranked = service.scoreAndRank(inputs);
 
       expect(ranked[0].id).toBe('close');
       expect(ranked[ranked.length - 1].id).toBe('far');
-      // Verify ranks are 1-based sequential
       expect(ranked.map((r) => r.rank)).toEqual([1, 2, 3]);
     });
 

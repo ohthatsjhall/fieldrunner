@@ -66,6 +66,9 @@ export const envSchema = z.object({
     .string({ error: 'ANTHROPIC_API_KEY is required' })
     .min(1, { error: 'ANTHROPIC_API_KEY must not be empty' }),
 
+  // ── Apify / BuildZoom (optional) ────────────────────────────────────
+  APIFY_API_TOKEN: z.string().optional(),
+
   // ── Nominatim (optional) ────────────────────────────────────────────
   NOMINATIM_USER_AGENT: z.string().optional(),
 });

@@ -5,6 +5,7 @@ import type {
   ScoredResult,
   CategoryMatchLevel,
   BusinessHoursStatus,
+  CredentialSignals,
 } from './scoring.types';
 import { DEFAULT_WEIGHTS } from './scoring.types';
 
@@ -40,13 +41,15 @@ export class VendorScoringService {
     const businessHoursScore = this.calcBusinessHoursScore(
       input.businessHoursStatus,
     );
+    const credentialScore = this.calcCredentialScore(input.credentialSignals);
 
     const totalScore = this.clamp(
       weights.distance * distanceScore +
         weights.rating * ratingScore +
         weights.reviewCount * reviewCountScore +
         weights.categoryMatch * categoryMatchScore +
-        weights.businessHours * businessHoursScore,
+        weights.businessHours * businessHoursScore +
+        weights.credential * credentialScore,
     );
 
     return {
@@ -56,6 +59,7 @@ export class VendorScoringService {
       reviewCountScore: this.round2(reviewCountScore),
       categoryMatchScore: this.round2(categoryMatchScore),
       businessHoursScore: this.round2(businessHoursScore),
+      credentialScore: this.round2(credentialScore),
     };
   }
 
@@ -85,7 +89,7 @@ export class VendorScoringService {
   }
 
   /**
-   * Exponential decay: 100 × exp(-distKm / (radiusKm/3))
+   * Exponential decay: 100 * exp(-distKm / (radiusKm/3))
    */
   private calcDistanceScore(
     distanceMeters: number | null,
@@ -99,7 +103,7 @@ export class VendorScoringService {
   }
 
   /**
-   * Bayesian average: (C×m + n×r) / (C+n) scaled to 0-100
+   * Bayesian average: (C*m + n*r) / (C+n) scaled to 0-100
    * where C=10 (prior review count), m=3.5 (prior mean rating)
    */
   private calcRatingScore(
@@ -116,7 +120,7 @@ export class VendorScoringService {
   }
 
   /**
-   * Log scale: min(100, log(1+n) / log(1+500) × 100)
+   * Log scale: min(100, log(1+n) / log(1+500) * 100)
    */
   private calcReviewCountScore(reviewCount: number | null): number {
     if (reviewCount === null || reviewCount <= 0) return 0;
@@ -147,6 +151,38 @@ export class VendorScoringService {
       closed: 25,
     };
     return scores[status];
+  }
+
+  /**
+   * Credential score from BuildZoom-style professional signals.
+   * Returns 0-100 based on license status, BZ score, insurance, permits.
+   */
+  calcCredentialScore(signals: CredentialSignals): number {
+    let score = 0;
+
+    // Active license: strongest signal (40 points max)
+    if (signals.hasActiveLicense === true) score += 40;
+
+    // Multiple licenses: breadth indicator (15 points max)
+    score += Math.min(15, signals.licenseCount * 5);
+
+    // BuildZoom score: normalized to 0-20 (20 points max)
+    if (signals.bzScore !== null) {
+      score += Math.min(20, (signals.bzScore / 200) * 20);
+    }
+
+    // Insurance on file (10 points)
+    if (signals.isInsured === true) score += 10;
+
+    // Recent permit activity (15 points max, log scale)
+    if (signals.recentPermitCount !== null && signals.recentPermitCount > 0) {
+      score += Math.min(
+        15,
+        (Math.log(1 + signals.recentPermitCount) / Math.log(51)) * 15,
+      );
+    }
+
+    return Math.min(100, score);
   }
 
   private clamp(value: number, min = 0, max = 100): number {
