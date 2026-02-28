@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { DM_Sans, Geist_Mono } from 'next/font/google';
+import { ThemeProvider } from '@/app/components/theme-provider';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const dmSans = DM_Sans({
+  variable: '--font-dm-sans',
   subsets: ['latin'],
 });
 
@@ -32,11 +33,18 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${dmSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
