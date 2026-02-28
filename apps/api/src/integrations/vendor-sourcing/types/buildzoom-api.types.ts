@@ -1,12 +1,3 @@
-/** Input payload for the actums/buildzoom-scraper Apify actor */
-export type BuildZoomActorInput = {
-  searchTerm: string;
-  locationQuery: string;
-  sortPermitsBy?: string;
-  maxPages?: number;
-  maxRequestsPerCrawl?: number;
-};
-
 /** License object nested inside a contractor result */
 export type BuildZoomLicense = {
   licenseNumber: string;
@@ -39,8 +30,13 @@ export type BuildZoomEmployee = {
 };
 
 /**
- * A single contractor from the BuildZoom scraper dataset.
- * Field names match the actual Apify actor output schema.
+ * A single contractor from the BuildZoom profile page.
+ *
+ * These fields serve dual purpose:
+ * 1. TypeScript type for downstream mapper/scoring
+ * 2. Target shape for Firecrawl JSON extraction schema
+ *
+ * The `[key: string]: unknown` index signature allows extra LLM-extracted fields.
  */
 export type BuildZoomContractor = {
   url: string;

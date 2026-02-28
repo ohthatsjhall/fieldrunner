@@ -4,6 +4,7 @@ export type PlaceSearchParams = {
   longitude: number;
   radiusMeters: number;
   locationName?: string;
+  tradeCategory?: string;
 };
 
 export type NormalizedPlace = {

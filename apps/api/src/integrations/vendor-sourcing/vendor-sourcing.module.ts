@@ -9,9 +9,10 @@ import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { OrganizationSettingsModule } from '../../org/settings/settings.module';
 import { BlueFolderModule } from '../bluefolder/bluefolder.module';
+import { FirecrawlModule } from '../firecrawl/firecrawl.module';
 
 @Module({
-  imports: [OrganizationSettingsModule, BlueFolderModule],
+  imports: [OrganizationSettingsModule, BlueFolderModule, FirecrawlModule],
   controllers: [VendorSourcingController],
   providers: [
     VendorSourcingService,

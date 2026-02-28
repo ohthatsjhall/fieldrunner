@@ -67,6 +67,7 @@ export class VendorSourcingService {
     // 1. Resolve address and search queries from SR or params
     let address: string;
     let searchQueries: string[];
+    let tradeCategory: string | undefined;
     let serviceRequestId: string | null = null;
     let srPostalFallback: string | null = null;
 
@@ -81,6 +82,7 @@ export class VendorSourcingService {
       // Use Claude to analyze the SR and generate optimal search queries
       const generated = await this.queryGenerator.generateSearchQueries(sr);
       searchQueries = generated.queries;
+      tradeCategory = generated.category;
 
       this.logger.log(
         `Claude generated queries: ${JSON.stringify(generated.queries)} ` +
@@ -101,6 +103,7 @@ export class VendorSourcingService {
     } else {
       address = params.address ?? '';
       if (params.tradeCategory) {
+        tradeCategory = params.tradeCategory;
         const resolved = await this.tradeCategoriesService.resolveSearchQueries(
           organizationId,
           params.tradeCategory,
@@ -158,7 +161,7 @@ export class VendorSourcingService {
 
       const [googleResult, buildZoomResult] = await Promise.allSettled([
         this.searchGoogle(searchQueries, geocoded, radiusMeters, sourceCounts),
-        this.searchBuildZoom(primaryQuery, geocoded, radiusMeters, locationName),
+        this.searchBuildZoom(primaryQuery, geocoded, radiusMeters, locationName, tradeCategory),
       ]);
 
       // Collect Google results
@@ -351,6 +354,7 @@ export class VendorSourcingService {
     geocoded: { latitude: number; longitude: number },
     radiusMeters: number,
     locationName: string,
+    tradeCategory?: string,
   ): Promise<NormalizedPlace[]> {
     if (!this.buildZoom.isEnabled) return [];
 
@@ -360,6 +364,7 @@ export class VendorSourcingService {
       longitude: geocoded.longitude,
       radiusMeters,
       locationName,
+      tradeCategory,
     });
   }
 
