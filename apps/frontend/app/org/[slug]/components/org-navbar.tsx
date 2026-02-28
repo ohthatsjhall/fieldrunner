@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton, useOrganization } from '@clerk/nextjs';
+import { Logo } from '../../../components/logo';
 
 export function OrgNavbar() {
   const { organization, isLoaded } = useOrganization();
@@ -25,7 +26,7 @@ export function OrgNavbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold">Fieldrunner</span>
+            <Logo />
             {isLoaded && organization ? (
               <div className="flex items-center gap-2">
                 {organization.imageUrl ? (

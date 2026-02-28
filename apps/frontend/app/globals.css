@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Aeonik Extended";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/aeonik-extended-medium.otf") format("opentype");
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -8,8 +16,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: #1D3171;
+  --color-secondary: #549BC1;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-title: "Aeonik Extended", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
