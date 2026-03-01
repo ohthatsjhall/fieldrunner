@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useOrganization, useUser, UserButton } from '@clerk/nextjs';
+import dynamic from 'next/dynamic';
+import { useAuth, useOrganization, useUser } from '@clerk/nextjs';
+
+const UserButton = dynamic(
+  () => import('@clerk/nextjs').then((mod) => ({ default: mod.UserButton })),
+  { ssr: false },
+);
 import { LayoutDashboard, ClipboardList, Menu } from 'lucide-react';
+import { useApiClient } from '@/lib/api-client-browser';
 import { Logo } from '@/app/components/logo';
+import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
@@ -21,12 +29,36 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+}
+
+function useNewRequestCount() {
+  const { orgId } = useAuth();
+  const { apiFetch } = useApiClient();
+  const [count, setCount] = useState(0);
+
+  const fetch = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ newCount: number }>('/bluefolder/stats');
+      setCount(data.newCount ?? 0);
+    } catch {
+      // non-critical — don't break the sidebar
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    fetch();
+  }, [orgId, fetch]);
+
+  return count;
 }
 
 function useNavItems(slug: string): NavItem[] {
+  const newCount = useNewRequestCount();
   return [
     { label: 'Dashboard', href: `/org/${slug}`, icon: LayoutDashboard },
-    { label: 'Requests', href: `/org/${slug}/requests`, icon: ClipboardList },
+    { label: 'Requests', href: `/org/${slug}/requests`, icon: ClipboardList, badge: newCount },
   ];
 }
 
@@ -156,6 +188,11 @@ function NavLinks({
               )}
             />
             {item.label}
+            {item.badge != null && item.badge > 0 && (
+              <Badge className="ml-auto bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                {item.badge}
+              </Badge>
+            )}
           </Link>
         );
       })}
