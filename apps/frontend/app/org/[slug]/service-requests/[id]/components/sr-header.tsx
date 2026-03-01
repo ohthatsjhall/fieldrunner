@@ -66,10 +66,10 @@ export function SrHeader({
       </nav>
 
       {/* Sticky title row */}
-      <div className="sticky top-0 z-10 bg-background pt-6 pb-4">
+      <div className="sticky top-0 z-10 bg-background pt-8 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="font-title text-2xl font-bold">
+            <h1 className="font-title text-3xl font-bold">
               SR #{sr.serviceRequestId}
             </h1>
             <StatusBadge status={sr.status} />
@@ -123,10 +123,10 @@ export function SrHeader({
 
       {/* Description */}
       {sr.description && (
-        <p className="text-muted-foreground">{sr.description}</p>
+        <p className="text-base text-zinc-500 dark:text-zinc-400">{sr.description}</p>
       )}
       {sr.detailedDescription && (
-        <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+        <p className="mt-2 whitespace-pre-line text-sm text-zinc-500 dark:text-zinc-400">
           {sr.detailedDescription}
         </p>
       )}
