@@ -4,34 +4,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
-import { cn } from '@/lib/utils';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
-
-function DescriptionRow({
-  label,
-  value,
-  index,
-}: {
-  label: string;
-  value: React.ReactNode;
-  index: number;
-}) {
-  if (!value) return null;
-
-  return (
-    <div
-      className={cn(
-        'px-6 py-3 sm:grid sm:grid-cols-3 sm:gap-4',
-        index % 2 === 0 && 'bg-muted/50',
-      )}
-    >
-      <dt className="text-sm/6 font-medium text-foreground">{label}</dt>
-      <dd className="mt-1 text-sm/6 text-muted-foreground sm:col-span-2 sm:mt-0">
-        {value}
-      </dd>
-    </div>
-  );
-}
+import { DescriptionRow } from './description-row';
 
 export function SrDetailsSection({ sr }: { sr: ServiceRequestDetail }) {
   const fields: { label: string; value: React.ReactNode }[] = [
@@ -63,7 +37,6 @@ export function SrDetailsSection({ sr }: { sr: ServiceRequestDetail }) {
     { label: 'PO #', value: sr.purchaseOrderNo },
   ];
 
-  // Filter to only rows that have values
   const visibleFields = fields.filter((f) => f.value);
 
   return (

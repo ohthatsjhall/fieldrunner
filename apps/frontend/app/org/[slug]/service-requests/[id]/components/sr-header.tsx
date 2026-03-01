@@ -11,6 +11,15 @@ function getAssigneeName(sr: ServiceRequestDetail): string | null {
   return null;
 }
 
+function MetadataItem({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <span className="text-muted-foreground">{label}</span>{' '}
+      <span className="font-semibold text-foreground">{value}</span>
+    </span>
+  );
+}
+
 export function SrHeader({
   sr,
   slug,
@@ -19,6 +28,12 @@ export function SrHeader({
   slug: string;
 }) {
   const assignee = getAssigneeName(sr);
+
+  const metadataItems = [
+    sr.type ? { label: 'Type', value: sr.type } : null,
+    sr.priority ? { label: 'Priority', value: sr.priority } : null,
+    sr.customerName ? { label: 'Customer', value: sr.customerName } : null,
+  ].filter(Boolean) as { label: string; value: string }[];
 
   return (
     <div>
@@ -89,36 +104,18 @@ export function SrHeader({
         </div>
 
         {/* Metadata bar */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {sr.type && (
-            <span>
-              <span className="text-muted-foreground">Type</span>{' '}
-              <span className="font-semibold text-foreground">{sr.type}</span>
-            </span>
-          )}
-          {sr.priority && (
-            <>
-              <span className="text-muted-foreground/40">&middot;</span>
-              <span>
-                <span className="text-muted-foreground">Priority</span>{' '}
-                <span className="font-semibold text-foreground">
-                  {sr.priority}
-                </span>
+        {metadataItems.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            {metadataItems.map((item, i) => (
+              <span key={item.label} className="flex items-center gap-x-4">
+                {i > 0 && (
+                  <span className="text-muted-foreground/40">&middot;</span>
+                )}
+                <MetadataItem label={item.label} value={item.value} />
               </span>
-            </>
-          )}
-          {sr.customerName && (
-            <>
-              <span className="text-muted-foreground/40">&middot;</span>
-              <span>
-                <span className="text-muted-foreground">Customer</span>{' '}
-                <span className="font-semibold text-foreground">
-                  {sr.customerName}
-                </span>
-              </span>
-            </>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Description */}

@@ -1,5 +1,9 @@
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
 
+function formatCurrency(amount: number): string {
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-card p-4">
@@ -23,19 +27,10 @@ export function SrFinancials({ sr }: { sr: ServiceRequestDetail }) {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <StatCard
-        label="Billable Total"
-        value={`$${sr.billableTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-      />
-      <StatCard
-        label="Cost Total"
-        value={`$${sr.costTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-      />
+      <StatCard label="Billable Total" value={formatCurrency(sr.billableTotal)} />
+      <StatCard label="Cost Total" value={formatCurrency(sr.costTotal)} />
       <StatCard label="Labor Hours" value={`${totalLaborHours.toFixed(1)}h`} />
-      <StatCard
-        label="Non-Billable"
-        value={`$${sr.nonBillableTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-      />
+      <StatCard label="Non-Billable" value={formatCurrency(sr.nonBillableTotal)} />
     </div>
   );
 }
