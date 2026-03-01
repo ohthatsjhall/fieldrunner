@@ -261,6 +261,7 @@ export type VendorSearchSession = {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   resultCount: number;
   sources: Record<string, number> | null;
+  pendingProfileUrls: string[] | null;
   errorMessage: string | null;
   durationMs: number | null;
   initiatedBy: string | null;

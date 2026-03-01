@@ -36,6 +36,14 @@ export type VendorSearchResponse = {
   resultCount: number;
   durationMs: number | null;
   candidates: VendorCandidate[];
+  hasMore: boolean;
+};
+
+export type LoadMoreVendorsResponse = {
+  sessionId: string;
+  candidates: VendorCandidate[];
+  hasMore: boolean;
+  resultCount: number;
 };
 
 export type VendorSearchRequest = {

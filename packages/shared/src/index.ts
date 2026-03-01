@@ -26,6 +26,7 @@ export type {
   VendorSearchStatus,
   VendorSearchResponse,
   VendorSearchRequest,
+  LoadMoreVendorsResponse,
 } from './vendor-sourcing.js';
 export type {
   ServiceRequestSummary,

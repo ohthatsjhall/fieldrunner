@@ -31,6 +31,7 @@ export const vendorSearchSessions = pgTable('vendor_search_sessions', {
   status: text('status').default('pending').notNull(),
   resultCount: integer('result_count').default(0).notNull(),
   sources: jsonb('sources').$type<Record<string, number>>(),
+  pendingProfileUrls: jsonb('pending_profile_urls').$type<string[]>(),
   errorMessage: text('error_message'),
   durationMs: integer('duration_ms'),
   initiatedBy: text('initiated_by'),
