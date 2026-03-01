@@ -30,6 +30,7 @@ export const vendors = pgTable(
     latitude: decimal('latitude', { precision: 10, scale: 7 }),
     longitude: decimal('longitude', { precision: 10, scale: 7 }),
     website: text('website'),
+    email: text('email'),
     googlePlaceId: text('google_place_id'),
     rating: decimal('rating', { precision: 3, scale: 2 }),
     reviewCount: integer('review_count'),

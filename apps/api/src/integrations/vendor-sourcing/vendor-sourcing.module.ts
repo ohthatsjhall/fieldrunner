@@ -10,6 +10,7 @@ import { TradeCategoriesService } from './trade-categories/trade-categories.serv
 import { OrganizationSettingsModule } from '../../org/settings/settings.module';
 import { BlueFolderModule } from '../bluefolder/bluefolder.module';
 import { FirecrawlModule } from '../firecrawl/firecrawl.module';
+import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
 
 @Module({
   imports: [OrganizationSettingsModule, BlueFolderModule, FirecrawlModule],
@@ -22,6 +23,7 @@ import { FirecrawlModule } from '../firecrawl/firecrawl.module';
     SearchQueryGeneratorService,
     VendorScoringService,
     TradeCategoriesService,
+    EmailEnrichmentService,
   ],
 })
 export class VendorSourcingModule {}

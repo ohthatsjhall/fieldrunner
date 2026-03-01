@@ -1,5 +1,8 @@
 export type { AuthUser, AuthOrganization } from './auth.js';
 export type {
+  VendorSource,
+  ServiceRequestStatus,
+  ValidEmail,
   User,
   Organization,
   OrganizationMembership,
@@ -10,6 +13,7 @@ export type {
   RolePermission,
   OrganizationSettings,
   ServiceRequest,
+  ServiceRequestStats,
   BlueFolderUser,
   TradeCategory,
   Vendor,

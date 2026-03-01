@@ -54,7 +54,7 @@
 }
 
 :root {
-  --background: #ffffff;
+  --background: #FAFAF8;
   --foreground: #0f172a;
   --card: #ffffff;
   --card-foreground: #0f172a;
@@ -125,7 +125,10 @@
 }
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
   }
 }

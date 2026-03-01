@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { OrganizationList } from '@clerk/nextjs';
 import { redirect } from 'next/navigation';
-import { OrgNavbar } from './components/org-navbar';
+import { AppSidebar } from './components/app-sidebar';
 import { SyncActiveOrg } from './components/sync-active-org';
 
 export default async function OrgLayout({
@@ -32,12 +32,9 @@ export default async function OrgLayout({
   }
 
   return (
-    <div className="min-h-screen">
+    <>
       <SyncActiveOrg />
-      <OrgNavbar />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
+      <AppSidebar slug={slug}>{children}</AppSidebar>
+    </>
   );
 }

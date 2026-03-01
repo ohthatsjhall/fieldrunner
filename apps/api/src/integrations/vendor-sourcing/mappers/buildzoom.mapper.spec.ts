@@ -50,6 +50,21 @@ describe('mapBuildZoomContractor', () => {
     expect(result.state).toBe('PA');
     expect(result.country).toBe('US');
     expect(result.types).toEqual(['Plumbing', 'Drain Cleaning', 'Water Heater']);
+    expect(result.email).toBeNull();
+  });
+
+  it('should normalize email when present on contractor', () => {
+    const result = mapBuildZoomContractor(
+      makeContractor({ email: '  Contact@AcmePlumbing.COM  ' }),
+    );
+    expect(result.email).toBe('contact@acmeplumbing.com');
+  });
+
+  it('should reject invalid email from contractor', () => {
+    const result = mapBuildZoomContractor(
+      makeContractor({ email: 'not-an-email' }),
+    );
+    expect(result.email).toBeNull();
   });
 
   it('should use url as sourceId', () => {
@@ -152,6 +167,7 @@ describe('mapBuildZoomContractor', () => {
     expect(minimal.types).toEqual([]);
     expect(minimal.businessHours).toBeNull();
     expect(minimal.website).toBeNull();
+    expect(minimal.email).toBeNull();
   });
 });
 

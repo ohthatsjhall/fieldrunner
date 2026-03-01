@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { eq, desc, sql, isNotNull, and, isNull } from 'drizzle-orm';
+import type { ServiceRequestStats } from '@fieldrunner/shared';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
 import {
@@ -17,16 +18,18 @@ export interface SyncResult {
   syncedAt: Date;
 }
 
-export interface ServiceRequestStats {
-  total: number;
-  open: number;
-  closed: number;
-  overdue: number;
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
 }
+
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const MAX_CACHE_SIZE = 50;
 
 @Injectable()
 export class ServiceRequestsService {
   private readonly logger = new Logger(ServiceRequestsService.name);
+  private readonly findAllCache = new Map<string, CacheEntry<(typeof serviceRequests.$inferSelect)[]>>();
 
   constructor(
     @Inject(DATABASE_CONNECTION)
@@ -66,6 +69,7 @@ export class ServiceRequestsService {
       type: sr.type,
       customerName: sr.customerName,
       customerId: sr.customerId || null,
+      assigneeName: sr.serviceManagerName || sr.accountManagerName || null,
       isOpen: sr.isOpen,
       isOverdue: sr.isOverdue,
       billableTotal: String(sr.billableTotal),
@@ -93,6 +97,7 @@ export class ServiceRequestsService {
           type: sql`excluded.type`,
           customerName: sql`excluded.customer_name`,
           customerId: sql`excluded.customer_id`,
+          assigneeName: sql`excluded.assignee_name`,
           isOpen: sql`excluded.is_open`,
           isOverdue: sql`excluded.is_overdue`,
           billableTotal: sql`excluded.billable_total`,
@@ -104,6 +109,8 @@ export class ServiceRequestsService {
         },
       });
 
+    this.findAllCache.delete(clerkOrgId);
+
     this.logger.log('Synced service requests', {
       clerkOrgId,
       total: items.length,
@@ -113,24 +120,62 @@ export class ServiceRequestsService {
   }
 
   async findAll(clerkOrgId: string) {
+    const cached = this.findAllCache.get(clerkOrgId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(serviceRequests)
       .where(eq(serviceRequests.organizationId, organizationId))
       .orderBy(desc(serviceRequests.bluefolderId));
+
+    this.evictExpiredCacheEntries();
+    if (this.findAllCache.size >= MAX_CACHE_SIZE) {
+      // Map preserves insertion order — delete the oldest entry
+      const oldestKey = this.findAllCache.keys().next().value!;
+      this.findAllCache.delete(oldestKey);
+    }
+
+    this.findAllCache.set(clerkOrgId, {
+      data: rows,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+
+    return rows;
+  }
+
+  private evictExpiredCacheEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.findAllCache) {
+      if (entry.expiresAt <= now) {
+        this.findAllCache.delete(key);
+      }
+    }
   }
 
   async getStats(clerkOrgId: string): Promise<ServiceRequestStats> {
     const rows = await this.findAll(clerkOrgId);
 
-    return {
-      total: rows.length,
-      open: rows.filter((r) => r.isOpen).length,
-      closed: rows.filter((r) => !r.isOpen).length,
-      overdue: rows.filter((r) => r.isOverdue).length,
+    const stats: ServiceRequestStats = {
+      newCount: 0,
+      inProgress: 0,
+      assigned: 0,
+      open: 0,
     };
+
+    for (const row of rows) {
+      const status = row.status?.toLowerCase();
+      if (status === 'new') stats.newCount++;
+      else if (status === 'in progress') stats.inProgress++;
+      else if (status === 'assigned') stats.assigned++;
+      if (row.isOpen) stats.open++;
+    }
+
+    return stats;
   }
 
   async getLastSyncedAt(clerkOrgId: string): Promise<Date | null> {

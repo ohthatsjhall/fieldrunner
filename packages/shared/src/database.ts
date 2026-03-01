@@ -1,3 +1,24 @@
+// -- Branded type utility --
+declare const __brand: unique symbol;
+type Brand<T, B extends string> = T & { readonly [__brand]: B };
+
+// -- Union types --
+export type VendorSource = 'google_places' | 'buildzoom';
+
+export type ServiceRequestStatus =
+  | 'New'
+  | 'Proposed'
+  | 'Assigned'
+  | 'In Progress'
+  | 'Job Costing'
+  | 'Work Complete'
+  | 'Waiting On Invoice'
+  | 'WO Needs Fix'
+  | 'Cancelled'
+  | 'Closed';
+
+export type ValidEmail = Brand<string, 'ValidEmail'>;
+
 export type User = {
   id: string;
   clerkId: string;
@@ -136,6 +157,7 @@ export type ServiceRequest = {
   type: string;
   customerName: string;
   customerId: number | null;
+  assigneeName: string | null;
   isOpen: boolean;
   isOverdue: boolean;
   billableTotal: string | null;
@@ -145,6 +167,13 @@ export type ServiceRequest = {
   syncedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ServiceRequestStats = {
+  newCount: number;
+  inProgress: number;
+  assigned: number;
+  open: number;
 };
 
 export type BlueFolderUser = {
@@ -188,6 +217,7 @@ export type Vendor = {
   latitude: string | null;
   longitude: string | null;
   website: string | null;
+  email: ValidEmail | null;
   googlePlaceId: string | null;
   rating: string | null;
   reviewCount: number | null;
@@ -201,7 +231,7 @@ export type Vendor = {
 export type VendorSourceRecord = {
   id: string;
   vendorId: string;
-  source: string;
+  source: VendorSource;
   sourceId: string;
   rawData: Record<string, unknown> | null;
   name: string | null;
@@ -210,6 +240,7 @@ export type VendorSourceRecord = {
   rating: string | null;
   reviewCount: number | null;
   website: string | null;
+  email: ValidEmail | null;
   types: string[] | null;
   businessHours: Record<string, unknown> | null;
   fetchedAt: Date;

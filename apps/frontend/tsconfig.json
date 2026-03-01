@@ -8,6 +8,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    "types": ["node", "react", "react-dom"],
     "jsx": "react-jsx",
     "plugins": [
       {

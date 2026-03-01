@@ -1,3 +1,5 @@
+import type { VendorSource, ValidEmail } from '@fieldrunner/shared';
+
 export type PlaceSearchParams = {
   query: string;
   latitude: number;
@@ -9,7 +11,7 @@ export type PlaceSearchParams = {
 
 export type NormalizedPlace = {
   sourceId: string;
-  source: string;
+  source: VendorSource;
   name: string;
   phone: string | null;
   address: string | null;
@@ -21,6 +23,7 @@ export type NormalizedPlace = {
   latitude: number | null;
   longitude: number | null;
   website: string | null;
+  email: ValidEmail | null;
   rating: number | null;
   reviewCount: number | null;
   types: string[];
@@ -29,6 +32,6 @@ export type NormalizedPlace = {
 };
 
 export interface PlaceProvider {
-  readonly name: string;
+  readonly name: VendorSource;
   search(params: PlaceSearchParams): Promise<NormalizedPlace[]>;
 }

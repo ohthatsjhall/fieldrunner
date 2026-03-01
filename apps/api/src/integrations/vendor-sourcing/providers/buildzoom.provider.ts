@@ -43,11 +43,12 @@ const CONTRACTOR_SCHEMA = {
       },
     },
     servicesOffered: { type: 'array', items: { type: 'string' } },
+    email: { type: 'string' },
   },
 };
 
 const EXTRACTION_PROMPT = `Extract all visible contractor information from this BuildZoom profile page.
-Look for: contractor name, phone number, BZ score (rating number), location/address,
+Look for: contractor name, phone number, email address, BZ score (rating number), location/address,
 insurance provider and amount, license numbers and status, number of projects/permits,
 and services offered. Extract license details from the sidebar if visible.
 Return numeric values as numbers (not strings) where appropriate, except bzScore which should be a string.`;

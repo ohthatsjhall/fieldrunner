@@ -1,3 +1,5 @@
+import type { ValidEmail } from './database.js';
+
 export type VendorCandidate = {
   vendorId: string;
   rank: number;
@@ -7,6 +9,7 @@ export type VendorCandidate = {
   phoneRaw: string | null;
   address: string | null;
   website: string | null;
+  email: ValidEmail | null;
   rating: number | null;
   reviewCount: number | null;
   distanceMeters: number | null;
