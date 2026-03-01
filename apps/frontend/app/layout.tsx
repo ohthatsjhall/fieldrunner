@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { DM_Sans, Geist_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/app/components/theme-provider';
+import { QueryProvider } from '@/hooks/queries';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -37,14 +38,16 @@ export default function RootLayout({
         <body
           className={`${dmSans.variable} ${geistMono.variable} antialiased`}
         >
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
+          <QueryProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>

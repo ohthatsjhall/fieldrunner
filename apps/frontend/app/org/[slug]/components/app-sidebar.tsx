@@ -1,18 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useAuth, useOrganization, useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/nextjs';
 
 const UserButton = dynamic(
   () => import('@clerk/nextjs').then((mod) => ({ default: mod.UserButton })),
   { ssr: false },
 );
 import { LayoutDashboard, ClipboardList, Menu } from 'lucide-react';
-import type { ServiceRequestStats } from '@fieldrunner/shared';
-import { useApiClient } from '@/lib/api-client-browser';
+import { useStats } from '@/hooks/queries';
 import { Logo } from '@/app/components/logo';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
@@ -33,30 +32,9 @@ interface NavItem {
   badge?: number;
 }
 
-function useNewRequestCount(): number {
-  const { orgId } = useAuth();
-  const { apiFetch } = useApiClient();
-  const [count, setCount] = useState(0);
-
-  const fetchCount = useCallback(async () => {
-    try {
-      const data = await apiFetch<ServiceRequestStats>('/bluefolder/stats');
-      setCount(data.newCount ?? 0);
-    } catch (err) {
-      console.warn('[useNewRequestCount] Failed to fetch stats:', err);
-    }
-  }, [apiFetch]);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetchCount();
-  }, [orgId, fetchCount]);
-
-  return count;
-}
-
 function useNavItems(slug: string): NavItem[] {
-  const newCount = useNewRequestCount();
+  const { data: stats } = useStats();
+  const newCount = stats?.newCount ?? 0;
   return [
     { label: 'Dashboard', href: `/org/${slug}`, icon: LayoutDashboard },
     { label: 'Requests', href: `/org/${slug}/requests`, icon: ClipboardList, badge: newCount },

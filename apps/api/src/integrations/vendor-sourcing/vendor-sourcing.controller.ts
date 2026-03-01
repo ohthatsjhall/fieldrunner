@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Post,
   Param,
   Body,
@@ -72,6 +73,7 @@ export class VendorSourcingController {
   }
 
   @Get('trade-categories')
+  @Header('Cache-Control', 'private, max-age=3600')
   @ApiOperation({ summary: 'List trade categories for the organization' })
   @ApiResponse({ status: 200, description: 'List of trade categories' })
   async listTradeCategories(@CurrentOrg() org: AuthOrganization) {

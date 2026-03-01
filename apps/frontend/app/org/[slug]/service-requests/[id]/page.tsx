@@ -1,15 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useApiClient } from '@/lib/api-client-browser';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import type {
-  ServiceRequestDetail,
-  ServiceRequestFile,
-  VendorSearchResponse,
-} from '@fieldrunner/shared';
+import {
+  useServiceRequestDetail,
+  useServiceRequestFiles,
+  useVendorSearch,
+} from '@/hooks/queries';
 
 import { SrLoading } from './components/sr-loading';
 import { SrHeader } from './components/sr-header';
@@ -20,97 +18,19 @@ import { SrVendors } from './components/sr-vendors';
 
 export default function ServiceRequestDetailPage() {
   const params = useParams<{ slug: string; id: string }>();
-  const { isLoaded } = useAuth();
-  const { apiFetch } = useApiClient();
+  const bluefolderId = Number(params.id);
 
-  const [sr, setSr] = useState<ServiceRequestDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: sr, isLoading, error } = useServiceRequestDetail(bluefolderId);
+  const [filesEnabled, setFilesEnabled] = useState(false);
+  const { data: files = [], isLoading: filesLoading, error: filesError } =
+    useServiceRequestFiles(bluefolderId, filesEnabled);
+  const vendorSearch = useVendorSearch();
 
-  const [files, setFiles] = useState<ServiceRequestFile[]>([]);
-  const [filesLoading, setFilesLoading] = useState(false);
-  const [filesError, setFilesError] = useState<string | null>(null);
-  const filesFetchedRef = useRef(false);
-
-  const [vendorSearch, setVendorSearch] = useState<VendorSearchResponse | null>(null);
-  const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
-  const [vendorSearchError, setVendorSearchError] = useState<string | null>(null);
-  const vendorSearchingRef = useRef(false);
-
-  // Fetch SR detail
-  useEffect(() => {
-    if (!isLoaded || !params.id) return;
-
-    async function fetchDetail() {
-      setLoading(true);
-      try {
-        const data = await apiFetch<ServiceRequestDetail>(
-          `/bluefolder/service-requests/${params.id}`,
-        );
-        setSr(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load service request',
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchDetail();
-  }, [isLoaded, params.id, apiFetch]);
-
-  // Lazy-load files
-  const fetchFiles = useCallback(async () => {
-    if (filesFetchedRef.current || !params.id) return;
-    filesFetchedRef.current = true;
-    setFilesLoading(true);
-    try {
-      const data = await apiFetch<ServiceRequestFile[]>(
-        `/bluefolder/service-requests/${params.id}/files`,
-      );
-      setFiles(data);
-    } catch (err) {
-      setFilesError(
-        err instanceof Error ? err.message : 'Failed to load files',
-      );
-    } finally {
-      setFilesLoading(false);
-    }
-  }, [params.id, apiFetch]);
-
-  // Vendor search
-  const runVendorSearch = useCallback(async () => {
-    if (!sr || vendorSearchingRef.current) return;
-    vendorSearchingRef.current = true;
-    setVendorSearchLoading(true);
-    setVendorSearchError(null);
-    try {
-      const data = await apiFetch<VendorSearchResponse>(
-        '/vendor-sourcing/search',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            serviceRequestBluefolderId: sr.serviceRequestId,
-          }),
-        },
-      );
-      setVendorSearch(data);
-    } catch (err) {
-      setVendorSearchError(
-        err instanceof Error ? err.message : 'Vendor search failed',
-      );
-    } finally {
-      vendorSearchingRef.current = false;
-      setVendorSearchLoading(false);
-    }
-  }, [sr, apiFetch]);
-
-  // Handle tab change — trigger file fetch on "files" tab
   function handleTabChange(value: string) {
-    if (value === 'files') fetchFiles();
+    if (value === 'files') setFilesEnabled(true);
   }
 
-  if (loading) {
+  if (isLoading) {
     return <SrLoading />;
   }
 
@@ -119,7 +39,7 @@ export default function ServiceRequestDetailPage() {
       <div className="space-y-4">
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">
-            {error || 'Service request not found'}
+            {error?.message || 'Service request not found'}
           </p>
         </div>
       </div>
@@ -143,10 +63,14 @@ export default function ServiceRequestDetailPage() {
             vendors={
               sr.status.toLowerCase() === 'assigned' ? (
                 <SrVendors
-                  onSearch={runVendorSearch}
-                  loading={vendorSearchLoading}
-                  error={vendorSearchError}
-                  result={vendorSearch}
+                  onSearch={() =>
+                    vendorSearch.mutate({
+                      serviceRequestBluefolderId: sr.serviceRequestId,
+                    })
+                  }
+                  loading={vendorSearch.isPending}
+                  error={vendorSearch.error?.message ?? null}
+                  result={vendorSearch.data ?? null}
                 />
               ) : null
             }
@@ -157,7 +81,7 @@ export default function ServiceRequestDetailPage() {
           <SrFilesTab
             files={files}
             loading={filesLoading}
-            error={filesError}
+            error={filesError?.message ?? null}
           />
         </TabsContent>
 
@@ -165,7 +89,6 @@ export default function ServiceRequestDetailPage() {
           <SrHistoryTab log={sr.log} />
         </TabsContent>
       </Tabs>
-
     </div>
   );
 }
