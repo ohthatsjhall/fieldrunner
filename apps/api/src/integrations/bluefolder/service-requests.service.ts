@@ -18,15 +18,23 @@ export interface SyncResult {
 }
 
 export interface ServiceRequestStats {
-  total: number;
+  newCount: number;
+  inProgress: number;
+  assigned: number;
   open: number;
-  closed: number;
-  overdue: number;
 }
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 @Injectable()
 export class ServiceRequestsService {
   private readonly logger = new Logger(ServiceRequestsService.name);
+  private readonly findAllCache = new Map<string, CacheEntry<(typeof serviceRequests.$inferSelect)[]>>();
 
   constructor(
     @Inject(DATABASE_CONNECTION)
@@ -66,6 +74,7 @@ export class ServiceRequestsService {
       type: sr.type,
       customerName: sr.customerName,
       customerId: sr.customerId || null,
+      assigneeName: sr.serviceManagerName || sr.accountManagerName || null,
       isOpen: sr.isOpen,
       isOverdue: sr.isOverdue,
       billableTotal: String(sr.billableTotal),
@@ -93,6 +102,7 @@ export class ServiceRequestsService {
           type: sql`excluded.type`,
           customerName: sql`excluded.customer_name`,
           customerId: sql`excluded.customer_id`,
+          assigneeName: sql`excluded.assignee_name`,
           isOpen: sql`excluded.is_open`,
           isOverdue: sql`excluded.is_overdue`,
           billableTotal: sql`excluded.billable_total`,
@@ -104,6 +114,8 @@ export class ServiceRequestsService {
         },
       });
 
+    this.findAllCache.delete(clerkOrgId);
+
     this.logger.log('Synced service requests', {
       clerkOrgId,
       total: items.length,
@@ -113,23 +125,35 @@ export class ServiceRequestsService {
   }
 
   async findAll(clerkOrgId: string) {
+    const cached = this.findAllCache.get(clerkOrgId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
 
-    return this.db
+    const rows = await this.db
       .select()
       .from(serviceRequests)
       .where(eq(serviceRequests.organizationId, organizationId))
       .orderBy(desc(serviceRequests.bluefolderId));
+
+    this.findAllCache.set(clerkOrgId, {
+      data: rows,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+
+    return rows;
   }
 
   async getStats(clerkOrgId: string): Promise<ServiceRequestStats> {
     const rows = await this.findAll(clerkOrgId);
 
     return {
-      total: rows.length,
+      newCount: rows.filter((r) => r.status?.toLowerCase() === 'new').length,
+      inProgress: rows.filter((r) => r.status?.toLowerCase() === 'in progress').length,
+      assigned: rows.filter((r) => r.status?.toLowerCase() === 'assigned').length,
       open: rows.filter((r) => r.isOpen).length,
-      closed: rows.filter((r) => !r.isOpen).length,
-      overdue: rows.filter((r) => r.isOverdue).length,
     };
   }
 

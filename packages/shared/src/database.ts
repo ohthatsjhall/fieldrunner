@@ -136,6 +136,7 @@ export type ServiceRequest = {
   type: string;
   customerName: string;
   customerId: number | null;
+  assigneeName: string | null;
   isOpen: boolean;
   isOverdue: boolean;
   billableTotal: string | null;

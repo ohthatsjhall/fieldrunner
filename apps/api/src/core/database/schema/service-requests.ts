@@ -26,6 +26,7 @@ export const serviceRequests = pgTable(
     type: text('type').default('').notNull(),
     customerName: text('customer_name').default('').notNull(),
     customerId: integer('customer_id'),
+    assigneeName: text('assignee_name'),
     isOpen: boolean('is_open').default(true).notNull(),
     isOverdue: boolean('is_overdue').default(false).notNull(),
     billableTotal: decimal('billable_total', {

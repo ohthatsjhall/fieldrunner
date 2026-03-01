@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Post,
   Param,
   ParseIntPipe,
@@ -37,6 +38,7 @@ export class BlueFolderController {
   }
 
   @Get('service-requests')
+  @Header('Cache-Control', 'private, max-age=120')
   @ApiOperation({ summary: 'List all synced service requests' })
   @ApiResponse({ status: 200, description: 'List of service requests' })
   listServiceRequests(@CurrentOrg() org: AuthOrganization) {
@@ -64,6 +66,7 @@ export class BlueFolderController {
   }
 
   @Get('stats')
+  @Header('Cache-Control', 'private, max-age=120')
   @ApiOperation({ summary: 'Get service request statistics' })
   @ApiResponse({ status: 200, description: 'Aggregated stats' })
   getStats(@CurrentOrg() org: AuthOrganization) {
