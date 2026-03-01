@@ -1,8 +1,15 @@
 import Link from 'next/link';
-import { ChevronRight, Home } from 'lucide-react';
+import { ChevronRight, Home, User } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { StatusBadge } from '@/app/org/[slug]/components/columns';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
+
+function getAssigneeName(sr: ServiceRequestDetail): string | null {
+  for (const a of sr.assignments) {
+    if (a.assigneeUserNames.length > 0) return a.assigneeUserNames[0];
+  }
+  return null;
+}
 
 export function SrHeader({
   sr,
@@ -11,6 +18,8 @@ export function SrHeader({
   sr: ServiceRequestDetail;
   slug: string;
 }) {
+  const assignee = getAssigneeName(sr);
+
   return (
     <div>
       {/* Breadcrumbs */}
@@ -57,13 +66,26 @@ export function SrHeader({
       </nav>
 
       {/* Sticky title row */}
-      <div className="sticky top-0 z-10 bg-background pt-4 pb-4">
-        <div className="flex items-center gap-3">
-          <h1 className="font-title text-2xl font-bold">
-            SR #{sr.serviceRequestId}
-          </h1>
-          <StatusBadge status={sr.status} />
-          {sr.isOverdue && <Badge variant="destructive">Overdue</Badge>}
+      <div className="sticky top-0 z-10 bg-background pt-6 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-title text-2xl font-bold">
+              SR #{sr.serviceRequestId}
+            </h1>
+            <StatusBadge status={sr.status} />
+            {sr.isOverdue && <Badge variant="destructive">Overdue</Badge>}
+          </div>
+
+          {assignee && (
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-muted">
+                <User className="size-4 text-muted-foreground" />
+              </div>
+              <span className="text-lg font-semibold text-foreground">
+                {assignee}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Metadata bar */}
