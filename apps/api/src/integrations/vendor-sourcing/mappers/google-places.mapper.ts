@@ -18,6 +18,7 @@ export function mapGooglePlace(place: GooglePlace): NormalizedPlace {
     latitude: place.location.latitude,
     longitude: place.location.longitude,
     website: place.websiteUri ?? null,
+    email: null,
     rating: place.rating ?? null,
     reviewCount: place.userRatingCount ?? null,
     types: place.types,

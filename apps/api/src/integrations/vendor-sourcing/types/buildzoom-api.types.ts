@@ -57,6 +57,7 @@ export type BuildZoomContractor = {
   insuredAmount?: string | null;
 
   reviewsCount?: number | null;
+  email?: string | null;
 
   licenses?: BuildZoomLicense[];
   employees?: BuildZoomEmployee[];

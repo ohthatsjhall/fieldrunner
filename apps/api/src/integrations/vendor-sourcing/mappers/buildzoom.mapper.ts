@@ -1,5 +1,6 @@
 import type { BuildZoomContractor } from '../types/buildzoom-api.types';
 import type { NormalizedPlace } from '../providers/provider.interface';
+import { normalizeEmail } from './email.util';
 
 export function mapBuildZoomContractor(
   contractor: BuildZoomContractor,
@@ -20,6 +21,7 @@ export function mapBuildZoomContractor(
     latitude: null,
     longitude: null,
     website: null,
+    email: normalizeEmail(contractor.email as string | null | undefined),
     rating: null,
     reviewCount: contractor.reviewsCount ?? null,
     types: contractor.servicesOffered ?? [],

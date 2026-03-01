@@ -53,6 +53,7 @@ describe('mapGooglePlace', () => {
     expect(result.latitude).toBe(30.2672);
     expect(result.longitude).toBe(-97.7431);
     expect(result.website).toBe('https://testplumbing.com');
+    expect(result.email).toBeNull();
     expect(result.rating).toBe(4.5);
     expect(result.reviewCount).toBe(120);
     expect(result.types).toEqual(['plumber', 'establishment']);

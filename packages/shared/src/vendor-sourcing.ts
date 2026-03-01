@@ -7,6 +7,7 @@ export type VendorCandidate = {
   phoneRaw: string | null;
   address: string | null;
   website: string | null;
+  email: string | null;
   rating: number | null;
   reviewCount: number | null;
   distanceMeters: number | null;

@@ -189,6 +189,7 @@ export type Vendor = {
   latitude: string | null;
   longitude: string | null;
   website: string | null;
+  email: string | null;
   googlePlaceId: string | null;
   rating: string | null;
   reviewCount: number | null;
@@ -211,6 +212,7 @@ export type VendorSourceRecord = {
   rating: string | null;
   reviewCount: number | null;
   website: string | null;
+  email: string | null;
   types: string[] | null;
   businessHours: Record<string, unknown> | null;
   fetchedAt: Date;

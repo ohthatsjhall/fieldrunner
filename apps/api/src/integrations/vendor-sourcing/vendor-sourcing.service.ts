@@ -16,6 +16,7 @@ import { BuildZoomProvider } from './providers/buildzoom.provider';
 import { SearchQueryGeneratorService } from './providers/search-query-generator.service';
 import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
+import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
 import { normalizePhone } from './mappers';
 import type { NormalizedPlace } from './providers/provider.interface';
 import type {
@@ -52,6 +53,7 @@ export class VendorSourcingService {
     private readonly queryGenerator: SearchQueryGeneratorService,
     private readonly scoring: VendorScoringService,
     private readonly tradeCategoriesService: TradeCategoriesService,
+    private readonly emailEnrichment: EmailEnrichmentService,
   ) {}
 
   async search(
@@ -206,10 +208,13 @@ export class VendorSourcingService {
         this.logger.warn('BuildZoom search failed', buildZoomResult.reason);
       }
 
-      // 5. Deduplicate and upsert vendors
+      // 5. Enrich emails from vendor websites (best-effort)
+      await this.emailEnrichment.enrichPlaces(allPlaces);
+
+      // 6. Deduplicate and upsert vendors
       const vendorIds = await this.upsertVendors(organizationId, allPlaces);
 
-      // 6. Score and rank
+      // 7. Score and rank
       const scoringInputs = allPlaces.map((p, i) => ({
         id: vendorIds[i],
         input: this.buildScoringInput(
@@ -223,10 +228,10 @@ export class VendorSourcingService {
         scoringInputs,
         radiusMeters,
         undefined,
-        5,
+        10,
       );
 
-      // 7. Insert search results
+      // 8. Insert search results
       if (ranked.length > 0) {
         await this.db.insert(vendorSearchResults).values(
           ranked.map((r) => {
@@ -260,7 +265,7 @@ export class VendorSourcingService {
         );
       }
 
-      // 8. Update session
+      // 9. Update session
       const durationMs = Date.now() - startTime;
       await this.db
         .update(vendorSearchSessions)
@@ -273,7 +278,7 @@ export class VendorSourcingService {
         })
         .where(eq(vendorSearchSessions.id, session.id));
 
-      // 9. Build response
+      // 10. Build response
       const candidates = this.buildCandidates(
         ranked,
         vendorIds,
@@ -463,6 +468,7 @@ export class VendorSourcingService {
             rating: p.rating !== null ? String(p.rating) : null,
             reviewCount: p.reviewCount,
             website: p.website,
+            email: p.email,
             googlePlaceId:
               p.source === 'google_places' ? p.sourceId : undefined,
             lastSeenAt: new Date(),
@@ -486,6 +492,7 @@ export class VendorSourcingService {
             latitude: p.latitude !== null ? String(p.latitude) : null,
             longitude: p.longitude !== null ? String(p.longitude) : null,
             website: p.website,
+            email: p.email,
             googlePlaceId:
               p.source === 'google_places' ? p.sourceId : null,
             rating: p.rating !== null ? String(p.rating) : null,
@@ -509,6 +516,7 @@ export class VendorSourcingService {
           rating: p.rating !== null ? String(p.rating) : null,
           reviewCount: p.reviewCount,
           website: p.website,
+          email: p.email,
           types: p.types,
           businessHours: p.businessHours,
         })
@@ -639,6 +647,7 @@ export class VendorSourcingService {
         phoneRaw: p?.phone ?? null,
         address: p?.address ?? null,
         website: p?.website ?? null,
+        email: p?.email ?? null,
         rating: p?.rating ?? null,
         reviewCount: p?.reviewCount ?? null,
         distanceMeters,

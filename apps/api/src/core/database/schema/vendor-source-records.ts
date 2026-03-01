@@ -27,6 +27,7 @@ export const vendorSourceRecords = pgTable(
     rating: decimal('rating', { precision: 3, scale: 2 }),
     reviewCount: integer('review_count'),
     website: text('website'),
+    email: text('email'),
     types: jsonb('types').$type<string[]>(),
     businessHours: jsonb('business_hours').$type<Record<string, unknown>>(),
     fetchedAt: timestamp('fetched_at', {

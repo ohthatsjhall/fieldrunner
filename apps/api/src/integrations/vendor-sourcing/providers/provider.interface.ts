@@ -21,6 +21,7 @@ export type NormalizedPlace = {
   latitude: number | null;
   longitude: number | null;
   website: string | null;
+  email: string | null;
   rating: number | null;
   reviewCount: number | null;
   types: string[];

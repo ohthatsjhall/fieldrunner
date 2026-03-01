@@ -9,6 +9,7 @@ import { BuildZoomProvider } from './providers/buildzoom.provider';
 import { SearchQueryGeneratorService } from './providers/search-query-generator.service';
 import { VendorScoringService } from './scoring/vendor-scoring.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
+import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
 import type { NormalizedPlace } from './providers/provider.interface';
@@ -84,6 +85,7 @@ function makeGooglePlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPl
     latitude: 30.27,
     longitude: -97.74,
     website: 'https://bestplumber.com',
+    email: null,
     rating: 4.8,
     reviewCount: 200,
     types: ['plumber'],
@@ -108,6 +110,7 @@ function makeBzPlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace 
     latitude: null,
     longitude: null,
     website: null,
+    email: null,
     rating: null,
     reviewCount: 3,
     types: ['Plumbing'],
@@ -150,6 +153,7 @@ describe('VendorSourcingService', () => {
   let mockQueryGenerator: jest.Mocked<SearchQueryGeneratorService>;
   let mockScoring: VendorScoringService;
   let mockTradeCategories: jest.Mocked<TradeCategoriesService>;
+  let mockEmailEnrichment: jest.Mocked<EmailEnrichmentService>;
   let mockDb: any;
 
   const clerkOrgId = 'org_test123';
@@ -220,6 +224,10 @@ describe('VendorSourcingService', () => {
       findAll: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<TradeCategoriesService>;
 
+    mockEmailEnrichment = {
+      enrichPlaces: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<EmailEnrichmentService>;
+
     mockDb = {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
@@ -244,6 +252,7 @@ describe('VendorSourcingService', () => {
         { provide: SearchQueryGeneratorService, useValue: mockQueryGenerator },
         { provide: VendorScoringService, useValue: mockScoring },
         { provide: TradeCategoriesService, useValue: mockTradeCategories },
+        { provide: EmailEnrichmentService, useValue: mockEmailEnrichment },
         { provide: DATABASE_CONNECTION, useValue: mockDb },
       ],
     }).compile();
