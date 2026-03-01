@@ -26,23 +26,21 @@ const db = drizzle(pool, { schema });
 async function truncateAll() {
   console.log('Truncating all tables...\n');
 
-  // Order matters: truncate children before parents to avoid FK issues,
-  // or just CASCADE. Using CASCADE for simplicity.
-  await db.execute(sql`
-    TRUNCATE TABLE
-      role_permissions,
-      organization_memberships,
-      organization_invitations,
-      organization_domains,
-      webhook_events,
-      users,
-      organizations,
-      roles,
-      permissions
-    CASCADE
+  const result = await db.execute<{ tablename: string }>(sql`
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
   `);
 
-  console.log('All tables truncated.');
+  const tables = (result.rows ?? []).map((r) => r.tablename);
+
+  if (tables.length === 0) {
+    console.log('No tables found.');
+    return;
+  }
+
+  const quoted = tables.map((t) => `"${t}"`).join(', ');
+  await db.execute(sql.raw(`TRUNCATE TABLE ${quoted} CASCADE`));
+
+  console.log(`Truncated ${tables.length} table(s): ${tables.join(', ')}`);
 }
 
 async function removeUser(clerkId: string) {
