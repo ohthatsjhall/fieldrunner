@@ -34,7 +34,7 @@ function StatsCards({ stats }: { stats: Stats }) {
           className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950"
         >
           <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{card.label}</p>
-          <p className={`text-3xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
+          <p className={`font-title text-3xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
         </div>
       ))}
     </div>
