@@ -33,19 +33,22 @@ export default function ServiceRequestDetailPage() {
   const [allCandidates, setAllCandidates] = useState<VendorCandidate[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const lastSessionId = useRef<string | null>(null);
+  const lastLoadMoreData = useRef<typeof loadMore.data>(undefined);
 
   // Reset on new search result
   useEffect(() => {
     if (vendorSearch.data && vendorSearch.data.sessionId !== lastSessionId.current) {
       lastSessionId.current = vendorSearch.data.sessionId;
+      lastLoadMoreData.current = undefined;
       setAllCandidates(vendorSearch.data.candidates);
       setHasMore(vendorSearch.data.hasMore ?? false);
     }
   }, [vendorSearch.data]);
 
-  // Append on load-more success
+  // Append on load-more success (guard against duplicate appends)
   useEffect(() => {
-    if (loadMore.data) {
+    if (loadMore.data && loadMore.data !== lastLoadMoreData.current) {
+      lastLoadMoreData.current = loadMore.data;
       setAllCandidates((prev) => [...prev, ...loadMore.data!.candidates]);
       setHasMore(loadMore.data.hasMore);
     }

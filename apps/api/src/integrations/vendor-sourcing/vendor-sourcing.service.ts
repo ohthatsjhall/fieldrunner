@@ -187,32 +187,16 @@ export class VendorSourcingService {
 
       // Collect BuildZoom results (dedup by phone, geocode missing coords)
       let pendingProfileUrls: string[] = [];
-      if (buildZoomResult.status === 'fulfilled' && buildZoomResult.value.places.length > 0) {
-        const bzPlaces = buildZoomResult.value.places;
-        pendingProfileUrls = buildZoomResult.value.pendingUrls;
-        sourceCounts['buildzoom'] = bzPlaces.length;
+      if (buildZoomResult.status === 'fulfilled') {
+        const { places: bzPlaces, pendingUrls } = buildZoomResult.value;
+        pendingProfileUrls = pendingUrls;
 
-        for (const p of bzPlaces) {
-          const norm = normalizePhone(p.phone);
-          if (norm && seenPhones.has(norm)) {
-            this.logger.log(`Cross-source dedup: ${p.name} (phone ${norm})`);
-            continue;
-          }
-
-          // Geocode BuildZoom results (they lack lat/lon)
-          if (p.latitude === null && p.longitude === null && p.address) {
-            const geo = await this.nominatim.geocode(p.address);
-            if (geo) {
-              p.latitude = geo.latitude;
-              p.longitude = geo.longitude;
-            }
-          }
-
-          allPlaces.push(p);
-          if (norm) seenPhones.add(norm);
+        if (bzPlaces.length > 0) {
+          sourceCounts['buildzoom'] = bzPlaces.length;
+          const dedupedBz = this.deduplicateByPhone(bzPlaces, seenPhones);
+          await this.geocodeMissingCoordinates(dedupedBz);
+          allPlaces.push(...dedupedBz);
         }
-      } else if (buildZoomResult.status === 'fulfilled') {
-        pendingProfileUrls = buildZoomResult.value.pendingUrls;
       } else {
         this.logger.warn('BuildZoom search failed', buildZoomResult.reason);
       }
@@ -225,21 +209,12 @@ export class VendorSourcingService {
 
       // 7. Score and rank (dedup by vendorId — multiple places can resolve to
       //    the same vendor when they share a phone number)
-      const seenVendorIds = new Set<string>();
-      const scoringInputs: { id: string; input: ScoringInput }[] = [];
-      for (let i = 0; i < allPlaces.length; i++) {
-        const vid = vendorIds[i];
-        if (seenVendorIds.has(vid)) continue;
-        seenVendorIds.add(vid);
-        scoringInputs.push({
-          id: vid,
-          input: this.buildScoringInput(
-            allPlaces[i],
-            geocoded!.latitude,
-            geocoded!.longitude,
-          ),
-        });
-      }
+      const scoringInputs = this.buildDedupedScoringInputs(
+        vendorIds,
+        allPlaces,
+        geocoded!.latitude,
+        geocoded!.longitude,
+      );
 
       const ranked = this.scoring.scoreAndRank(
         scoringInputs,
@@ -248,35 +223,13 @@ export class VendorSourcingService {
 
       // 8. Insert search results
       if (ranked.length > 0) {
-        await this.db.insert(vendorSearchResults).values(
-          ranked.map((r) => {
-            const placeIdx = vendorIds.indexOf(r.id);
-            const p = placeIdx >= 0 ? allPlaces[placeIdx] : null;
-            const distMeters =
-              p?.latitude != null && p?.longitude != null
-                ? this.haversine(
-                    geocoded!.latitude,
-                    geocoded!.longitude,
-                    p.latitude,
-                    p.longitude,
-                  )
-                : null;
-
-            return {
-              searchSessionId: session.id,
-              vendorId: r.id,
-              rank: r.rank,
-              score: String(r.scored.totalScore),
-              distanceScore: String(r.scored.distanceScore),
-              ratingScore: String(r.scored.ratingScore),
-              reviewCountScore: String(r.scored.reviewCountScore),
-              categoryMatchScore: String(r.scored.categoryMatchScore),
-              businessHoursScore: String(r.scored.businessHoursScore),
-              credentialScore: String(r.scored.credentialScore),
-              distanceMeters:
-                distMeters !== null ? String(distMeters.toFixed(2)) : null,
-            };
-          }),
+        await this.insertSearchResults(
+          session.id,
+          ranked,
+          vendorIds,
+          allPlaces,
+          geocoded!.latitude,
+          geocoded!.longitude,
         );
       }
 
@@ -295,7 +248,7 @@ export class VendorSourcingService {
         .where(eq(vendorSearchSessions.id, session.id));
 
       this.logger.log(
-        `Search complete: ${ranked.length} ranked, ${pendingProfileUrls.length} pending URLs, hasMore=${pendingProfileUrls.length > 0}`,
+        `Search complete: ${ranked.length} ranked, ${pendingProfileUrls.length} pending URLs`,
       );
 
       // 10. Build response
@@ -479,14 +432,8 @@ export class VendorSourcingService {
     const remainingUrls = pendingUrls.slice(5);
 
     // 3. Scrape profiles
-    this.logger.log(`Load-more scraping ${urlsToScrape.length} URLs: ${JSON.stringify(urlsToScrape)}`);
+    this.logger.log(`Load-more scraping ${urlsToScrape.length} BuildZoom profiles`);
     const bzPlaces = await this.buildZoom.scrapeProfiles(urlsToScrape);
-
-    for (const p of bzPlaces) {
-      this.logger.log(
-        `Load-more scraped: "${p.name}" | address="${p.address}" | phone="${p.phone}" | rating=${p.rating} | lat=${p.latitude} | types=${JSON.stringify(p.types)}`,
-      );
-    }
 
     // 4. Dedup against existing session vendors by phone
     const existingResults = await this.db
@@ -507,26 +454,8 @@ export class VendorSourcingService {
       }
     }
 
-    const newPlaces: NormalizedPlace[] = [];
-    for (const p of bzPlaces) {
-      const norm = normalizePhone(p.phone);
-      if (norm && existingPhones.has(norm)) {
-        this.logger.log(`Load-more dedup: ${p.name} (phone ${norm})`);
-        continue;
-      }
-
-      // Geocode if missing coordinates
-      if (p.latitude === null && p.longitude === null && p.address) {
-        const geo = await this.nominatim.geocode(p.address);
-        if (geo) {
-          p.latitude = geo.latitude;
-          p.longitude = geo.longitude;
-        }
-      }
-
-      newPlaces.push(p);
-      if (norm) existingPhones.add(norm);
-    }
+    const newPlaces = this.deduplicateByPhone(bzPlaces, existingPhones);
+    await this.geocodeMissingCoordinates(newPlaces);
 
     // 5. Enrich emails
     await this.emailEnrichment.enrichPlaces(newPlaces);
@@ -538,17 +467,13 @@ export class VendorSourcingService {
     const searchLat = Number(session.searchLatitude);
     const searchLng = Number(session.searchLongitude);
 
-    const seenVendorIds = new Set<string>();
-    const scoringInputs: { id: string; input: ScoringInput }[] = [];
-    for (let i = 0; i < newPlaces.length; i++) {
-      const vid = vendorIds[i];
-      if (seenVendorIds.has(vid)) continue;
-      seenVendorIds.add(vid);
-      scoringInputs.push({
-        id: vid,
-        input: this.buildScoringInput(newPlaces[i], searchLat, searchLng),
-      });
-    }
+    const scoringInputs = this.buildDedupedScoringInputs(
+      vendorIds,
+      newPlaces,
+      searchLat,
+      searchLng,
+      existingVendorIds,
+    );
 
     const scored = this.scoring.scoreAndRank(
       scoringInputs,
@@ -564,31 +489,19 @@ export class VendorSourcingService {
     const startRank = (maxRank ?? 0) + 1;
 
     // 9. Insert search results with continuing ranks
-    if (scored.length > 0) {
-      await this.db.insert(vendorSearchResults).values(
-        scored.map((r, i) => {
-          const placeIdx = vendorIds.indexOf(r.id);
-          const p = placeIdx >= 0 ? newPlaces[placeIdx] : null;
-          const distMeters =
-            p?.latitude != null && p?.longitude != null
-              ? this.haversine(searchLat, searchLng, p.latitude, p.longitude)
-              : null;
+    const rankedScored = scored.map((r, i) => ({
+      ...r,
+      rank: startRank + i,
+    }));
 
-          return {
-            searchSessionId: sessionId,
-            vendorId: r.id,
-            rank: startRank + i,
-            score: String(r.scored.totalScore),
-            distanceScore: String(r.scored.distanceScore),
-            ratingScore: String(r.scored.ratingScore),
-            reviewCountScore: String(r.scored.reviewCountScore),
-            categoryMatchScore: String(r.scored.categoryMatchScore),
-            businessHoursScore: String(r.scored.businessHoursScore),
-            credentialScore: String(r.scored.credentialScore),
-            distanceMeters:
-              distMeters !== null ? String(distMeters.toFixed(2)) : null,
-          };
-        }),
+    if (rankedScored.length > 0) {
+      await this.insertSearchResults(
+        sessionId,
+        rankedScored,
+        vendorIds,
+        newPlaces,
+        searchLat,
+        searchLng,
       );
     }
 
@@ -605,10 +518,7 @@ export class VendorSourcingService {
 
     // 11. Build response
     const candidates = this.buildCandidates(
-      scored.map((r, i) => ({
-        ...r,
-        rank: startRank + i,
-      })),
+      rankedScored,
       vendorIds,
       newPlaces,
       searchLat,
@@ -742,6 +652,94 @@ export class VendorSourcingService {
     }
 
     return vendorIds;
+  }
+
+  private buildDedupedScoringInputs(
+    vendorIds: string[],
+    places: NormalizedPlace[],
+    searchLat: number,
+    searchLng: number,
+    excludeVendorIds?: Set<string>,
+  ): { id: string; input: ScoringInput }[] {
+    const seen = new Set<string>(excludeVendorIds);
+    const inputs: { id: string; input: ScoringInput }[] = [];
+
+    for (let i = 0; i < places.length; i++) {
+      const vid = vendorIds[i];
+      if (seen.has(vid)) continue;
+      seen.add(vid);
+      inputs.push({
+        id: vid,
+        input: this.buildScoringInput(places[i], searchLat, searchLng),
+      });
+    }
+
+    return inputs;
+  }
+
+  private deduplicateByPhone(
+    places: NormalizedPlace[],
+    existingPhones: Set<string>,
+  ): NormalizedPlace[] {
+    const result: NormalizedPlace[] = [];
+
+    for (const p of places) {
+      const norm = normalizePhone(p.phone);
+      if (norm && existingPhones.has(norm)) continue;
+      result.push(p);
+      if (norm) existingPhones.add(norm);
+    }
+
+    return result;
+  }
+
+  private async geocodeMissingCoordinates(
+    places: NormalizedPlace[],
+  ): Promise<void> {
+    for (const p of places) {
+      if (p.latitude === null && p.longitude === null && p.address) {
+        const geo = await this.nominatim.geocode(p.address);
+        if (geo) {
+          p.latitude = geo.latitude;
+          p.longitude = geo.longitude;
+        }
+      }
+    }
+  }
+
+  private async insertSearchResults(
+    searchSessionId: string,
+    ranked: { id: string; rank: number; scored: ScoredResult }[],
+    vendorIds: string[],
+    places: NormalizedPlace[],
+    searchLat: number,
+    searchLng: number,
+  ): Promise<void> {
+    await this.db.insert(vendorSearchResults).values(
+      ranked.map((r) => {
+        const placeIdx = vendorIds.indexOf(r.id);
+        const p = placeIdx >= 0 ? places[placeIdx] : null;
+        const distMeters =
+          p?.latitude != null && p?.longitude != null
+            ? this.haversine(searchLat, searchLng, p.latitude, p.longitude)
+            : null;
+
+        return {
+          searchSessionId,
+          vendorId: r.id,
+          rank: r.rank,
+          score: String(r.scored.totalScore),
+          distanceScore: String(r.scored.distanceScore),
+          ratingScore: String(r.scored.ratingScore),
+          reviewCountScore: String(r.scored.reviewCountScore),
+          categoryMatchScore: String(r.scored.categoryMatchScore),
+          businessHoursScore: String(r.scored.businessHoursScore),
+          credentialScore: String(r.scored.credentialScore),
+          distanceMeters:
+            distMeters !== null ? String(distMeters.toFixed(2)) : null,
+        };
+      }),
+    );
   }
 
   private buildScoringInput(

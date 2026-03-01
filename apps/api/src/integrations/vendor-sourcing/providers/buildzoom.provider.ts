@@ -108,12 +108,12 @@ export class BuildZoomProvider implements PlaceProvider {
       urls.map((url) => this.scrapeProfile(url)),
     );
 
-    const contractors: BuildZoomContractor[] = [];
-    for (const entry of settled) {
-      if (entry.status === 'fulfilled' && entry.value) {
-        contractors.push(entry.value);
-      }
-    }
+    const contractors = settled
+      .filter(
+        (entry): entry is PromiseFulfilledResult<BuildZoomContractor> =>
+          entry.status === 'fulfilled' && entry.value !== null,
+      )
+      .map((entry) => entry.value);
 
     this.logger.log(
       `BuildZoom extracted ${contractors.length}/${urls.length} profiles`,

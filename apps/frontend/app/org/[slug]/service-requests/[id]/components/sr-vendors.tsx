@@ -246,7 +246,7 @@ export function SrVendors({
   onSearch: () => void;
   loading: boolean;
   error: string | null;
-  result: (VendorSearchResponse & { hasMore: boolean }) | null;
+  result: VendorSearchResponse | null;
   onLoadMore?: () => void;
   loadingMore?: boolean;
 }) {
@@ -287,7 +287,7 @@ export function SrVendors({
           </CardContent>
         )}
 
-        {result && result.candidates.length > 0 && (
+        {result && candidates.length > 0 && (
           <CardContent className="px-0">
             <Table>
               <TableHeader>
@@ -332,7 +332,7 @@ export function SrVendors({
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      <Loader2 className="size-3.5 animate-spin" />
                       Loading&hellip;
                     </>
                   ) : (
@@ -344,7 +344,7 @@ export function SrVendors({
           </CardContent>
         )}
 
-        {result && result.candidates.length === 0 && (
+        {result && candidates.length === 0 && (
           <CardContent>
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Search className="mb-3 size-8 text-muted-foreground/50" />
