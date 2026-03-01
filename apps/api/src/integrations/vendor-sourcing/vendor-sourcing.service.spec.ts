@@ -202,6 +202,15 @@ describe('VendorSourcingService', () => {
       name: 'buildzoom',
       isEnabled: true,
       search: jest.fn().mockResolvedValue([makeBzPlace()]),
+      discoverProfileUrls: jest.fn().mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-plumbing',
+        'https://www.buildzoom.com/contractor/bz-plumbing-2',
+        'https://www.buildzoom.com/contractor/bz-plumbing-3',
+        'https://www.buildzoom.com/contractor/bz-plumbing-4',
+        'https://www.buildzoom.com/contractor/bz-plumbing-5',
+        'https://www.buildzoom.com/contractor/bz-plumbing-6',
+      ]),
+      scrapeProfiles: jest.fn().mockResolvedValue([makeBzPlace()]),
     } as unknown as jest.Mocked<BuildZoomProvider>;
 
     mockQueryGenerator = {
@@ -277,6 +286,7 @@ describe('VendorSourcingService', () => {
       expect(result.candidates.length).toBeGreaterThan(0);
       expect(result.candidates[0].rank).toBe(1);
       expect(result.candidates[0].score).toBeGreaterThan(0);
+      expect(result.hasMore).toBe(true);
       expect(mockEmailEnrichment.enrichPlaces).toHaveBeenCalledTimes(1);
     });
 
@@ -357,7 +367,8 @@ describe('VendorSourcingService', () => {
       });
 
       expect(mockGooglePlaces.search).toHaveBeenCalled();
-      expect(mockBuildZoom.search).toHaveBeenCalled();
+      expect(mockBuildZoom.discoverProfileUrls).toHaveBeenCalled();
+      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalled();
     });
 
     it('should geocode BuildZoom results lacking coordinates', async () => {
@@ -375,7 +386,7 @@ describe('VendorSourcingService', () => {
 
     it('should deduplicate across sources by phone', async () => {
       // BZ returns same phone as Google result — should be skipped
-      mockBuildZoom.search.mockResolvedValue([
+      mockBuildZoom.scrapeProfiles.mockResolvedValue([
         makeBzPlace({ phone: '+1 512-555-0001' }), // same as Google's Best Plumber
       ]);
 
@@ -391,7 +402,7 @@ describe('VendorSourcingService', () => {
     });
 
     it('should continue with Google-only when BuildZoom fails', async () => {
-      mockBuildZoom.search.mockRejectedValue(new Error('BZ timeout'));
+      mockBuildZoom.discoverProfileUrls.mockRejectedValue(new Error('BZ timeout'));
 
       const result = await service.search(clerkOrgId, {
         serviceRequestBluefolderId: 2270,
@@ -421,6 +432,165 @@ describe('VendorSourcingService', () => {
         expect(c.scores.credential).toBeDefined();
         expect(typeof c.scores.credential).toBe('number');
       }
+    });
+
+    it('should return hasMore: true when pending URLs exist', async () => {
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-1',
+        'https://www.buildzoom.com/contractor/bz-2',
+        'https://www.buildzoom.com/contractor/bz-3',
+        'https://www.buildzoom.com/contractor/bz-4',
+        'https://www.buildzoom.com/contractor/bz-5',
+        'https://www.buildzoom.com/contractor/bz-6',
+        'https://www.buildzoom.com/contractor/bz-7',
+      ]);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('should return hasMore: false when no pending URLs', async () => {
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-1',
+        'https://www.buildzoom.com/contractor/bz-2',
+      ]);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should return hasMore: false on failed search', async () => {
+      mockNominatim.geocode.mockResolvedValue(null);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should deduplicate vendors with the same phone across providers', async () => {
+      // Google returns two places from different queries with the same phone
+      const place1 = makeGooglePlace({
+        sourceId: 'ChIJ_dup1',
+        name: 'Plumber A (listing 1)',
+        phone: '+1 512-555-7777',
+      });
+      const place2 = makeGooglePlace({
+        sourceId: 'ChIJ_dup2',
+        name: 'Plumber A (listing 2)',
+        phone: '+1 512-555-7777', // same phone
+      });
+
+      mockGooglePlaces.search.mockResolvedValue([place1, place2]);
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([]);
+      mockBuildZoom.scrapeProfiles.mockResolvedValue([]);
+
+      // Mock chain: SR lookup → phone match (place1) → vendor update (place1)
+      //   → phone match (place2) → vendor update (place2) → session update
+      mockDb.where
+        .mockResolvedValueOnce([{ id: 'sr-uuid' }]) // SR lookup
+        .mockResolvedValueOnce([{ id: 'same-vendor-id' }]) // phone match for place1
+        .mockResolvedValueOnce(undefined) // vendor update for place1
+        .mockResolvedValueOnce([{ id: 'same-vendor-id' }]) // phone match for place2
+        .mockResolvedValueOnce(undefined) // vendor update for place2
+        .mockResolvedValueOnce(undefined); // session update
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      // Should NOT crash with a unique constraint violation.
+      // Only 1 candidate should be returned (deduped by vendorId).
+      expect(result.status).toBe('completed');
+      expect(result.candidates.length).toBe(1);
+    });
+  });
+
+  describe('loadMore', () => {
+    it('should return empty candidates when session has no pending URLs', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        {
+          id: 'session-uuid',
+          organizationId: internalOrgId,
+          pendingProfileUrls: null,
+          resultCount: 5,
+          searchLatitude: '30.2672',
+          searchLongitude: '-97.7431',
+          searchRadiusMeters: 40000,
+        },
+      ]);
+
+      const result = await service.loadMore(clerkOrgId, 'session-uuid');
+
+      expect(result.candidates).toEqual([]);
+      expect(result.hasMore).toBe(false);
+      expect(result.resultCount).toBe(5);
+    });
+
+    it('should return empty candidates when session not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const result = await service.loadMore(clerkOrgId, 'nonexistent');
+
+      expect(result.candidates).toEqual([]);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should scrape next batch of pending URLs', async () => {
+      // The loadMore method chains many DB queries via mockDb.where
+      // 1. Session lookup → session row
+      // 2. Existing results → [] (no existing results)
+      // 3. Vendor upsert lookup (phone dedup) → [] (no existing vendor)
+      // 4. Insert vendor → returning → [{id: 'new-vendor'}]
+      // 5. Insert vendor source record → onConflictDoNothing
+      // 6. Max rank query → [{maxRank: 5}]
+      // 7. Insert search results
+      // 8. Update session → where
+      mockDb.where
+        .mockResolvedValueOnce([
+          {
+            id: 'session-uuid',
+            organizationId: internalOrgId,
+            pendingProfileUrls: [
+              'https://www.buildzoom.com/contractor/bz-6',
+              'https://www.buildzoom.com/contractor/bz-7',
+            ],
+            resultCount: 5,
+            searchLatitude: '30.2672',
+            searchLongitude: '-97.7431',
+            searchRadiusMeters: 40000,
+          },
+        ])
+        // Existing results query
+        .mockResolvedValueOnce([])
+        // Vendor phone lookup (upsert)
+        .mockResolvedValueOnce([])
+        // Max rank query
+        .mockResolvedValueOnce([{ maxRank: 5 }])
+        // Update session
+        .mockResolvedValueOnce(undefined);
+
+      // Insert vendor → returning new vendor
+      mockDb.returning.mockResolvedValueOnce([{ id: 'new-vendor-uuid' }]);
+
+      mockBuildZoom.scrapeProfiles.mockResolvedValue([makeBzPlace()]);
+
+      const result = await service.loadMore(clerkOrgId, 'session-uuid');
+
+      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalledWith([
+        'https://www.buildzoom.com/contractor/bz-6',
+        'https://www.buildzoom.com/contractor/bz-7',
+      ]);
+      expect(result.candidates.length).toBeGreaterThan(0);
+      expect(result.hasMore).toBe(false);
+      expect(result.candidates[0].rank).toBe(6); // continues from max rank 5
     });
   });
 });

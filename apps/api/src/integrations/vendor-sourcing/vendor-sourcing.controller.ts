@@ -15,6 +15,7 @@ import { VendorSourcingService } from './vendor-sourcing.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
+import { LoadMoreVendorsDto } from './dto/load-more-vendors.dto';
 
 @ApiTags('Vendor Sourcing')
 @ApiBearerAuth()
@@ -34,6 +35,16 @@ export class VendorSourcingController {
     @Body() dto: SearchVendorsDto,
   ) {
     return this.vendorSourcingService.search(org.orgId, dto);
+  }
+
+  @Post('load-more')
+  @ApiOperation({ summary: 'Load more vendor results from a previous search' })
+  @ApiResponse({ status: 201, description: 'Next batch of scored vendors' })
+  loadMore(
+    @CurrentOrg() org: AuthOrganization,
+    @Body() dto: LoadMoreVendorsDto,
+  ) {
+    return this.vendorSourcingService.loadMore(org.orgId, dto.sessionId);
   }
 
   @Get('sessions')
