@@ -12,6 +12,7 @@ import type {
   VendorSearchRequest,
   VendorSearchResponse,
   VendorSearchSession,
+  LoadMoreVendorsResponse,
 } from '@fieldrunner/shared';
 
 import { queryKeys } from './query-keys';
@@ -77,6 +78,29 @@ export function useVendorSearch() {
 
   return useApiMutation<VendorSearchResponse, VendorSearchRequest>({
     path: '/vendor-sourcing/search',
+    method: 'POST',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.sessions(orgId),
+      });
+    },
+  });
+}
+
+/**
+ * Loads the next batch of vendor results from a previous search session.
+ *
+ * @example
+ *   const loadMore = useLoadMoreVendors();
+ *   loadMore.mutate({ sessionId: 'uuid' });
+ */
+export function useLoadMoreVendors() {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<LoadMoreVendorsResponse, { sessionId: string }>({
+    path: '/vendor-sourcing/load-more',
     method: 'POST',
     onSuccess: () => {
       if (!orgId) return;

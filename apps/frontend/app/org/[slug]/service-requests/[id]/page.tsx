@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import {
   useServiceRequestDetail,
   useServiceRequestFiles,
   useVendorSearch,
+  useLoadMoreVendors,
 } from '@/hooks/queries';
+import type { VendorCandidate } from '@fieldrunner/shared';
 
 import { SrLoading } from './components/sr-loading';
 import { SrHeader } from './components/sr-header';
@@ -25,6 +27,29 @@ export default function ServiceRequestDetailPage() {
   const { data: files = [], isLoading: filesLoading, error: filesError } =
     useServiceRequestFiles(bluefolderId, filesEnabled);
   const vendorSearch = useVendorSearch();
+  const loadMore = useLoadMoreVendors();
+
+  // Accumulate candidates across search + load-more calls
+  const [allCandidates, setAllCandidates] = useState<VendorCandidate[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const lastSessionId = useRef<string | null>(null);
+
+  // Reset on new search result
+  useEffect(() => {
+    if (vendorSearch.data && vendorSearch.data.sessionId !== lastSessionId.current) {
+      lastSessionId.current = vendorSearch.data.sessionId;
+      setAllCandidates(vendorSearch.data.candidates);
+      setHasMore(vendorSearch.data.hasMore ?? false);
+    }
+  }, [vendorSearch.data]);
+
+  // Append on load-more success
+  useEffect(() => {
+    if (loadMore.data) {
+      setAllCandidates((prev) => [...prev, ...loadMore.data!.candidates]);
+      setHasMore(loadMore.data.hasMore);
+    }
+  }, [loadMore.data]);
 
   function handleTabChange(value: string) {
     if (value === 'files') setFilesEnabled(true);
@@ -70,7 +95,22 @@ export default function ServiceRequestDetailPage() {
                   }
                   loading={vendorSearch.isPending}
                   error={vendorSearch.error?.message ?? null}
-                  result={vendorSearch.data ?? null}
+                  result={
+                    vendorSearch.data
+                      ? {
+                          ...vendorSearch.data,
+                          candidates: allCandidates,
+                          resultCount: allCandidates.length,
+                          hasMore,
+                        }
+                      : null
+                  }
+                  onLoadMore={() => {
+                    if (lastSessionId.current) {
+                      loadMore.mutate({ sessionId: lastSessionId.current });
+                    }
+                  }}
+                  loadingMore={loadMore.isPending}
                 />
               ) : null
             }

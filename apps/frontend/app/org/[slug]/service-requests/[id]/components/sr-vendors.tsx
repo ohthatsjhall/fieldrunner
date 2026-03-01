@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -235,23 +235,22 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
   );
 }
 
-const INITIAL_SHOW = 5;
-
 export function SrVendors({
   onSearch,
   loading,
   error,
   result,
+  onLoadMore,
+  loadingMore,
 }: {
   onSearch: () => void;
   loading: boolean;
   error: string | null;
-  result: VendorSearchResponse | null;
+  result: (VendorSearchResponse & { hasMore: boolean }) | null;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const candidates = result?.candidates ?? [];
-  const hasMore = candidates.length > INITIAL_SHOW;
-  const visible = expanded ? candidates : candidates.slice(0, INITIAL_SHOW);
 
   return (
     <TooltipProvider>
@@ -317,29 +316,27 @@ export function SrVendors({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visible.map((c) => (
+                {candidates.map((c) => (
                   <VendorRow key={c.vendorId} candidate={c} />
                 ))}
               </TableBody>
             </Table>
-            {hasMore && (
-              <div className="flex justify-end px-4 pt-2">
+            {result?.hasMore && onLoadMore && (
+              <div className="flex justify-center px-4 pt-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-xs text-muted-foreground"
-                  onClick={() => setExpanded((prev) => !prev)}
+                  disabled={loadingMore}
+                  onClick={onLoadMore}
                 >
-                  {expanded ? (
+                  {loadingMore ? (
                     <>
-                      Show less
-                      <ChevronUp className="ml-1 size-3.5" />
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      Loading&hellip;
                     </>
                   ) : (
-                    <>
-                      +{candidates.length - INITIAL_SHOW} more
-                      <ChevronDown className="ml-1 size-3.5" />
-                    </>
+                    'Load more vendors'
                   )}
                 </Button>
               </div>
