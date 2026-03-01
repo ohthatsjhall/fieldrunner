@@ -4,17 +4,15 @@ import type { ServiceRequestDetail } from '@fieldrunner/shared';
 import { SrDetailsSection } from './sr-details-section';
 import { SrCustomerSection } from './sr-customer-section';
 import { SrFinancials } from './sr-financials';
-import { SrAssignments } from './sr-assignments';
 import { SrWorkItems } from './sr-work-items';
 import { SrEquipment } from './sr-equipment';
 import { SrCustomFields } from './sr-custom-fields';
 
-export function SrOverview({ sr, vendorDebug }: { sr: ServiceRequestDetail; vendorDebug?: ReactNode }) {
+export function SrOverview({ sr, vendors }: { sr: ServiceRequestDetail; vendors?: ReactNode }) {
   const hasWorkItems =
     sr.labor.length > 0 ||
     sr.materials.length > 0 ||
     sr.expenses.length > 0;
-  const hasAssignments = sr.assignments.length > 0;
   const hasEquipment = sr.equipment.length > 0;
   const hasCustomFields = sr.customFields.length > 0;
 
@@ -25,14 +23,6 @@ export function SrOverview({ sr, vendorDebug }: { sr: ServiceRequestDetail; vend
         <SrDetailsSection sr={sr} />
         <SrCustomerSection sr={sr} />
       </div>
-
-      {/* Assignments first */}
-      {hasAssignments && (
-        <>
-          <Separator />
-          <SrAssignments assignments={sr.assignments} />
-        </>
-      )}
 
       {/* Financials — hidden when all zeros */}
       <SrFinancials sr={sr} />
@@ -55,10 +45,10 @@ export function SrOverview({ sr, vendorDebug }: { sr: ServiceRequestDetail; vend
         </>
       )}
 
-      {vendorDebug && (
+      {vendors && (
         <>
           <Separator />
-          {vendorDebug}
+          {vendors}
         </>
       )}
 

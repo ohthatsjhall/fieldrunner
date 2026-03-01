@@ -16,7 +16,7 @@ import { SrHeader } from './components/sr-header';
 import { SrOverview } from './components/sr-overview';
 import { SrFilesTab } from './components/sr-files-tab';
 import { SrHistoryTab } from './components/sr-history-tab';
-import { SrVendorDebug } from './components/sr-vendor-debug';
+import { SrVendors } from './components/sr-vendors';
 
 export default function ServiceRequestDetailPage() {
   const params = useParams<{ slug: string; id: string }>();
@@ -35,6 +35,7 @@ export default function ServiceRequestDetailPage() {
   const [vendorSearch, setVendorSearch] = useState<VendorSearchResponse | null>(null);
   const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
   const [vendorSearchError, setVendorSearchError] = useState<string | null>(null);
+  const vendorSearchingRef = useRef(false);
 
   // Fetch SR detail
   useEffect(() => {
@@ -79,7 +80,8 @@ export default function ServiceRequestDetailPage() {
 
   // Vendor search
   const runVendorSearch = useCallback(async () => {
-    if (!sr || vendorSearchLoading) return;
+    if (!sr || vendorSearchingRef.current) return;
+    vendorSearchingRef.current = true;
     setVendorSearchLoading(true);
     setVendorSearchError(null);
     try {
@@ -98,9 +100,10 @@ export default function ServiceRequestDetailPage() {
         err instanceof Error ? err.message : 'Vendor search failed',
       );
     } finally {
+      vendorSearchingRef.current = false;
       setVendorSearchLoading(false);
     }
-  }, [sr, vendorSearchLoading, apiFetch]);
+  }, [sr, apiFetch]);
 
   // Handle tab change — trigger file fetch on "files" tab
   function handleTabChange(value: string) {
@@ -137,9 +140,9 @@ export default function ServiceRequestDetailPage() {
         <TabsContent value="overview">
           <SrOverview
             sr={sr}
-            vendorDebug={
+            vendors={
               sr.status.toLowerCase() === 'assigned' ? (
-                <SrVendorDebug
+                <SrVendors
                   onSearch={runVendorSearch}
                   loading={vendorSearchLoading}
                   error={vendorSearchError}
