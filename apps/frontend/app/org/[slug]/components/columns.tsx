@@ -15,7 +15,11 @@ import {
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
 
-// -- Column header with sort + optional filter dropdown --
+function SortIcon({ direction }: { direction: false | 'asc' | 'desc' }) {
+  if (direction === 'asc') return <ArrowUp className="ml-1 size-3.5" />;
+  if (direction === 'desc') return <ArrowDown className="ml-1 size-3.5" />;
+  return <ArrowUpDown className="ml-1 size-3.5" />;
+}
 
 function SortButton({ column, label }: { column: Column<ServiceRequest>; label: string }) {
   const sorted = column.getIsSorted();
@@ -27,13 +31,7 @@ function SortButton({ column, label }: { column: Column<ServiceRequest>; label: 
       onClick={() => column.toggleSorting(sorted === 'asc')}
     >
       {label}
-      {sorted === 'asc' ? (
-        <ArrowUp className="ml-1 size-3.5" />
-      ) : sorted === 'desc' ? (
-        <ArrowDown className="ml-1 size-3.5" />
-      ) : (
-        <ArrowUpDown className="ml-1 size-3.5" />
-      )}
+      <SortIcon direction={sorted} />
     </Button>
   );
 }
@@ -182,17 +180,19 @@ export function useServiceRequestColumns(data: ServiceRequest[]) {
   return columns;
 }
 
-// -- Badge components (moved from org-dashboard-content) --
+// -- Badge components --
+
+const STATUS_COLORS: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  'in progress': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  closed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+};
+
+const DEFAULT_STATUS_COLOR = 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
 
 export function StatusBadge({ status }: { status: string }) {
   const lower = String(status ?? '').toLowerCase();
-  let classes = 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
-  if (lower === 'new')
-    classes = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-  if (lower === 'in progress')
-    classes = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-  if (lower === 'closed')
-    classes = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+  const classes = STATUS_COLORS[lower] ?? DEFAULT_STATUS_COLOR;
 
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${classes}`}>
@@ -201,13 +201,18 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const PRIORITY_COLORS: Record<string, string> = {
+  high: 'text-red-600 dark:text-red-400 font-medium',
+  urgent: 'text-red-600 dark:text-red-400 font-medium',
+  normal: 'text-zinc-600 dark:text-zinc-400',
+  low: 'text-zinc-400',
+};
+
+const DEFAULT_PRIORITY_COLOR = 'text-zinc-500';
+
 export function PriorityBadge({ priority }: { priority: string }) {
   const lower = String(priority ?? '').toLowerCase();
-  let classes = 'text-zinc-500';
-  if (lower === 'high' || lower === 'urgent')
-    classes = 'text-red-600 dark:text-red-400 font-medium';
-  if (lower === 'normal') classes = 'text-zinc-600 dark:text-zinc-400';
-  if (lower === 'low') classes = 'text-zinc-400';
+  const classes = PRIORITY_COLORS[lower] ?? DEFAULT_PRIORITY_COLOR;
 
   return <span className={`text-sm ${classes}`}>{priority}</span>;
 }

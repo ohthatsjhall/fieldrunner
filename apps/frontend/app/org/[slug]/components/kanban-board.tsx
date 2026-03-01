@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Building2 } from 'lucide-react';
-import type { ServiceRequest } from '@fieldrunner/shared';
+import type { ServiceRequest, ServiceRequestStatus } from '@fieldrunner/shared';
 import { StatusBadge, PriorityBadge } from './columns';
 
-const STATUS_ORDER: string[] = [
+const STATUS_ORDER: ServiceRequestStatus[] = [
   'New',
   'Proposed',
   'Assigned',
@@ -40,11 +40,17 @@ function groupByStatus(requests: ServiceRequest[]): Map<string, ServiceRequest[]
   return groups;
 }
 
+const PRIORITY_BORDER_COLORS: Record<string, string> = {
+  high: 'border-l-red-500',
+  urgent: 'border-l-red-500',
+  normal: 'border-l-amber-400',
+};
+
+const DEFAULT_PRIORITY_BORDER = 'border-l-zinc-300 dark:border-l-zinc-600';
+
 function getPriorityBorderColor(priority: string): string {
   const lower = String(priority ?? '').toLowerCase();
-  if (lower === 'high' || lower === 'urgent') return 'border-l-red-500';
-  if (lower === 'normal') return 'border-l-amber-400';
-  return 'border-l-zinc-300 dark:border-l-zinc-600';
+  return PRIORITY_BORDER_COLORS[lower] ?? DEFAULT_PRIORITY_BORDER;
 }
 
 function KanbanCard({ sr }: { sr: ServiceRequest }) {

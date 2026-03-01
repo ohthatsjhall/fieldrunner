@@ -48,6 +48,12 @@ function formatCategory(cat: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function getScoreColor(score: number): string {
+  if (score >= 70) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+  if (score >= 40) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+  return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+}
+
 function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
 
@@ -114,11 +120,7 @@ function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
         <div
           className={cn(
             'mx-auto inline-flex h-7 w-12 items-center justify-center rounded-md text-sm font-semibold',
-            c.score >= 70
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : c.score >= 40
-                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+            getScoreColor(c.score),
           )}
         >
           {Math.round(c.score)}
@@ -209,10 +211,14 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
           variant="ghost"
           size="icon-sm"
           aria-label={`Copy phone number for ${name}`}
-          onClick={() => {
-            navigator.clipboard.writeText(phone);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(phone);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch (err) {
+              console.warn('[CopyPhoneButton] Clipboard write failed:', err);
+            }
           }}
         >
           {copied ? (

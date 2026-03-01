@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailEnrichmentService } from './email-enrichment.service';
 import { FirecrawlService } from '../../firecrawl/firecrawl.service';
 import type { NormalizedPlace } from '../providers/provider.interface';
+import type { ValidEmail } from '@fieldrunner/shared';
 
 function makePlace(
   overrides: Partial<NormalizedPlace> = {},
@@ -70,7 +71,7 @@ describe('EmailEnrichmentService', () => {
   });
 
   it('should skip places that already have an email', async () => {
-    const places = [makePlace({ email: 'existing@acme.com' })];
+    const places = [makePlace({ email: 'existing@acme.com' as ValidEmail })];
     await service.enrichPlaces(places);
 
     expect(mockFirecrawl.scrapeJson).not.toHaveBeenCalled();
@@ -157,7 +158,7 @@ describe('EmailEnrichmentService', () => {
     });
 
     const places = [
-      makePlace({ email: 'already@here.com', website: 'https://here.com' }),
+      makePlace({ email: 'already@here.com' as ValidEmail, website: 'https://here.com' }),
       makePlace({ website: null }),
       makePlace({ sourceId: '3', website: 'https://needsemail.com' }),
     ];

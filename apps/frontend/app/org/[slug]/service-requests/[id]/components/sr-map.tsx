@@ -29,8 +29,8 @@ export function SrMap({ address }: { address: string }) {
           `pin-s+1D3171(${lng},${lat})/${lng},${lat},14,0/` +
           `600x200@2x?access_token=${MAPBOX_TOKEN}`;
         setImgUrl(url);
-      } catch {
-        // Silently fail — map is a nice-to-have
+      } catch (err) {
+        console.warn('[SrMap] Geocoding failed:', err);
       }
     }
 

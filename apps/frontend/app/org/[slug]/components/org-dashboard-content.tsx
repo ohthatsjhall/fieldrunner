@@ -5,20 +5,13 @@ import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { TableProperties, Columns3 } from 'lucide-react';
 import { useApiClient } from '@/lib/api-client-browser';
-import type { ServiceRequest } from '@fieldrunner/shared';
+import type { ServiceRequest, ServiceRequestStats } from '@fieldrunner/shared';
 import { cn } from '@/lib/utils';
 import { DataTable } from './data-table';
 import { useServiceRequestColumns } from './columns';
 import { KanbanBoard } from './kanban-board';
 
-interface Stats {
-  newCount: number;
-  inProgress: number;
-  assigned: number;
-  open: number;
-}
-
-function StatsCards({ stats }: { stats: Stats }) {
+function StatsCards({ stats }: { stats: ServiceRequestStats }) {
   const cards = [
     { label: 'New', value: stats.newCount, color: 'text-blue-600 dark:text-blue-400' },
     { label: 'Assigned', value: stats.assigned, color: 'text-violet-600 dark:text-violet-400' },
@@ -61,7 +54,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
   const router = useRouter();
   const { apiFetch } = useApiClient();
 
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<ServiceRequestStats | null>(null);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,13 +63,21 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
   const [hideClosed, setHideClosed] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>(() => {
     if (typeof window === 'undefined') return 'table';
-    const saved = localStorage.getItem('sr-view-mode');
-    return saved === 'kanban' ? 'kanban' : 'table';
+    try {
+      const saved = localStorage.getItem('sr-view-mode');
+      return saved === 'kanban' ? 'kanban' : 'table';
+    } catch {
+      return 'table';
+    }
   });
 
   const handleViewMode = useCallback((mode: 'table' | 'kanban') => {
     setViewMode(mode);
-    localStorage.setItem('sr-view-mode', mode);
+    try {
+      localStorage.setItem('sr-view-mode', mode);
+    } catch (err) {
+      console.warn('[OrgDashboardContent] Failed to persist view mode:', err);
+    }
   }, []);
 
   const visibleRequests = useMemo(
@@ -94,7 +95,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
     setError(null);
     try {
       const [statsData, srData] = await Promise.all([
-        apiFetch<Stats>('/bluefolder/stats'),
+        apiFetch<ServiceRequestStats>('/bluefolder/stats'),
         apiFetch<ServiceRequest[]>('/bluefolder/service-requests'),
       ]);
 
@@ -105,8 +106,8 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
       try {
         const syncData = await apiFetch<{ lastSyncedAt: string | null }>('/bluefolder/sync-status');
         setLastSyncedAt(syncData.lastSyncedAt ?? null);
-      } catch {
-        // ignore sync-status failures
+      } catch (err) {
+        console.warn('[OrgDashboardContent] Failed to fetch sync status:', err);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';

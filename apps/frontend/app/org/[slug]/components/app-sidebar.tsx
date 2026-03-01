@@ -11,6 +11,7 @@ const UserButton = dynamic(
   { ssr: false },
 );
 import { LayoutDashboard, ClipboardList, Menu } from 'lucide-react';
+import type { ServiceRequestStats } from '@fieldrunner/shared';
 import { useApiClient } from '@/lib/api-client-browser';
 import { Logo } from '@/app/components/logo';
 import { Badge } from '@/app/components/ui/badge';
@@ -32,24 +33,24 @@ interface NavItem {
   badge?: number;
 }
 
-function useNewRequestCount() {
+function useNewRequestCount(): number {
   const { orgId } = useAuth();
   const { apiFetch } = useApiClient();
   const [count, setCount] = useState(0);
 
-  const fetch = useCallback(async () => {
+  const fetchCount = useCallback(async () => {
     try {
-      const data = await apiFetch<{ newCount: number }>('/bluefolder/stats');
+      const data = await apiFetch<ServiceRequestStats>('/bluefolder/stats');
       setCount(data.newCount ?? 0);
-    } catch {
-      // non-critical — don't break the sidebar
+    } catch (err) {
+      console.warn('[useNewRequestCount] Failed to fetch stats:', err);
     }
   }, [apiFetch]);
 
   useEffect(() => {
     if (!orgId) return;
-    fetch();
-  }, [orgId, fetch]);
+    fetchCount();
+  }, [orgId, fetchCount]);
 
   return count;
 }
@@ -62,7 +63,7 @@ function useNavItems(slug: string): NavItem[] {
   ];
 }
 
-function isActive(pathname: string, href: string, slug: string) {
+function isActive(pathname: string, href: string, slug: string): boolean {
   if (href === `/org/${slug}`) {
     return pathname === href;
   }

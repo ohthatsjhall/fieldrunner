@@ -165,6 +165,36 @@ describe('ServiceRequestsService', () => {
       expect(callOrder).toEqual(['userSync', 'srList']);
     });
 
+    it.each([
+      {
+        label: 'serviceManager present',
+        serviceManagerName: 'Alice',
+        accountManagerName: 'Bob',
+        expected: 'Alice',
+      },
+      {
+        label: 'serviceManager null, falls back to accountManager',
+        serviceManagerName: null,
+        accountManagerName: 'Charlie',
+        expected: 'Charlie',
+      },
+      {
+        label: 'both null',
+        serviceManagerName: null,
+        accountManagerName: null,
+        expected: null,
+      },
+    ])('should map assigneeName correctly when $label', async ({ serviceManagerName, accountManagerName, expected }) => {
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceManagerName, accountManagerName }),
+      ]);
+
+      await service.sync(clerkOrgId);
+
+      const upsertedRows = mockDb.values.mock.calls[0][0];
+      expect(upsertedRows[0].assigneeName).toBe(expected);
+    });
+
     it('should continue SR sync even if user sync fails', async () => {
       mockUsersService.sync.mockRejectedValue(new Error('User API down'));
       mockBlueFolderService.listServiceRequests.mockResolvedValue([]);
@@ -193,19 +223,21 @@ describe('ServiceRequestsService', () => {
   describe('getStats', () => {
     it('should compute stats from DB rows', async () => {
       const dbRows = [
-        { isOpen: true, isOverdue: false },
-        { isOpen: true, isOverdue: true },
-        { isOpen: false, isOverdue: false },
+        { status: 'New', isOpen: true },
+        { status: 'In Progress', isOpen: true },
+        { status: 'Assigned', isOpen: true },
+        { status: 'Closed', isOpen: false },
+        { status: 'NEW', isOpen: true },
       ];
       mockDb.orderBy.mockResolvedValue(dbRows);
 
       const stats = await service.getStats(clerkOrgId);
 
       expect(stats).toEqual({
-        total: 3,
-        open: 2,
-        closed: 1,
-        overdue: 1,
+        newCount: 2,
+        inProgress: 1,
+        assigned: 1,
+        open: 4,
       });
     });
 
@@ -214,7 +246,7 @@ describe('ServiceRequestsService', () => {
 
       const stats = await service.getStats(clerkOrgId);
 
-      expect(stats).toEqual({ total: 0, open: 0, closed: 0, overdue: 0 });
+      expect(stats).toEqual({ newCount: 0, inProgress: 0, assigned: 0, open: 0 });
     });
   });
 

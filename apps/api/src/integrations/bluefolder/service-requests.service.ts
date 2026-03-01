@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { eq, desc, sql, isNotNull, and, isNull } from 'drizzle-orm';
+import type { ServiceRequestStats } from '@fieldrunner/shared';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
 import {
@@ -17,19 +18,13 @@ export interface SyncResult {
   syncedAt: Date;
 }
 
-export interface ServiceRequestStats {
-  newCount: number;
-  inProgress: number;
-  assigned: number;
-  open: number;
-}
-
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
 }
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const MAX_CACHE_SIZE = 50;
 
 @Injectable()
 export class ServiceRequestsService {
@@ -138,6 +133,13 @@ export class ServiceRequestsService {
       .where(eq(serviceRequests.organizationId, organizationId))
       .orderBy(desc(serviceRequests.bluefolderId));
 
+    this.evictExpiredCacheEntries();
+    if (this.findAllCache.size >= MAX_CACHE_SIZE) {
+      // Map preserves insertion order — delete the oldest entry
+      const oldestKey = this.findAllCache.keys().next().value!;
+      this.findAllCache.delete(oldestKey);
+    }
+
     this.findAllCache.set(clerkOrgId, {
       data: rows,
       expiresAt: Date.now() + CACHE_TTL_MS,
@@ -146,15 +148,34 @@ export class ServiceRequestsService {
     return rows;
   }
 
+  private evictExpiredCacheEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.findAllCache) {
+      if (entry.expiresAt <= now) {
+        this.findAllCache.delete(key);
+      }
+    }
+  }
+
   async getStats(clerkOrgId: string): Promise<ServiceRequestStats> {
     const rows = await this.findAll(clerkOrgId);
 
-    return {
-      newCount: rows.filter((r) => r.status?.toLowerCase() === 'new').length,
-      inProgress: rows.filter((r) => r.status?.toLowerCase() === 'in progress').length,
-      assigned: rows.filter((r) => r.status?.toLowerCase() === 'assigned').length,
-      open: rows.filter((r) => r.isOpen).length,
+    const stats: ServiceRequestStats = {
+      newCount: 0,
+      inProgress: 0,
+      assigned: 0,
+      open: 0,
     };
+
+    for (const row of rows) {
+      const status = row.status?.toLowerCase();
+      if (status === 'new') stats.newCount++;
+      else if (status === 'in progress') stats.inProgress++;
+      else if (status === 'assigned') stats.assigned++;
+      if (row.isOpen) stats.open++;
+    }
+
+    return stats;
   }
 
   async getLastSyncedAt(clerkOrgId: string): Promise<Date | null> {

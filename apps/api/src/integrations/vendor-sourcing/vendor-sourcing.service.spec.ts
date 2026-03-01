@@ -277,6 +277,7 @@ describe('VendorSourcingService', () => {
       expect(result.candidates.length).toBeGreaterThan(0);
       expect(result.candidates[0].rank).toBe(1);
       expect(result.candidates[0].score).toBeGreaterThan(0);
+      expect(mockEmailEnrichment.enrichPlaces).toHaveBeenCalledTimes(1);
     });
 
     it('should use Claude to generate search queries from SR detail', async () => {
