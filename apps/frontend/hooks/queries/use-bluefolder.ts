@@ -180,25 +180,26 @@ export function useSyncBlueFolder() {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useApiMutation<void, void>({
+  return useApiMutation<{ total: number; syncedAt: string }, void>({
     path: '/bluefolder/sync',
     method: 'POST',
-    onSuccess: () => {
+    onSuccess: (data) => {
       if (!orgId) return;
 
-      // Invalidate stats, the full SR subtree, and sync status.
-      // Using Promise.all is not required — invalidateQueries is synchronous
-      // in terms of marking queries stale; refetches happen in the background.
+      // Optimistically set sync status from the mutation response so the
+      // timestamp updates immediately (bypasses the browser HTTP cache).
+      queryClient.setQueryData(
+        queryKeys.bluefolder.syncStatus(orgId),
+        { lastSyncedAt: data.syncedAt },
+      );
+
+      // Invalidate stats and the full SR subtree so lists/details refetch.
       queryClient.invalidateQueries({
         queryKey: queryKeys.bluefolder.stats(orgId),
         refetchType: 'all',
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.bluefolder.serviceRequests.all(orgId),
-        refetchType: 'all',
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.bluefolder.syncStatus(orgId),
         refetchType: 'all',
       });
     },
