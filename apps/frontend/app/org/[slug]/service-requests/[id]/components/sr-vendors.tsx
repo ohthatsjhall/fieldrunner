@@ -66,6 +66,30 @@ function getScoreColor(score: number): string {
   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
 }
 
+function CategoryTags({ categories }: { categories: string[] }) {
+  const filtered = filterCategories(categories);
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {filtered.slice(0, 3).map((cat) => (
+        <Badge
+          key={cat}
+          variant="outline"
+          className="px-1.5 py-0 text-[10px]"
+        >
+          {formatCategory(cat)}
+        </Badge>
+      ))}
+      {filtered.length > 3 && (
+        <span className="text-[10px] text-muted-foreground">
+          +{filtered.length - 3}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
 
@@ -81,28 +105,9 @@ function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
           {c.address && (
             <span className="text-xs text-muted-foreground">{c.address}</span>
           )}
-          {c.categories && c.categories.length > 0 && (() => {
-            const filtered = filterCategories(c.categories);
-            if (filtered.length === 0) return null;
-            return (
-            <div className="flex flex-wrap gap-1">
-              {filtered.slice(0, 3).map((cat) => (
-                <Badge
-                  key={cat}
-                  variant="outline"
-                  className="px-1.5 py-0 text-[10px]"
-                >
-                  {formatCategory(cat)}
-                </Badge>
-              ))}
-              {filtered.length > 3 && (
-                <span className="text-[10px] text-muted-foreground">
-                  +{filtered.length - 3}
-                </span>
-              )}
-            </div>
-            );
-          })()}
+          {c.categories && c.categories.length > 0 && (
+            <CategoryTags categories={c.categories} />
+          )}
         </div>
       </TableCell>
 
@@ -251,6 +256,46 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
   );
 }
 
+function SearchButton({
+  loading,
+  onClick,
+  label,
+  icon: Icon,
+  variant = 'default',
+}: {
+  loading: boolean;
+  onClick: () => void;
+  label: string;
+  icon: typeof Search;
+  variant?: 'default' | 'outline';
+}) {
+  return (
+    <Button variant={variant} onClick={onClick} disabled={loading}>
+      {loading ? (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          Searching&hellip;
+        </>
+      ) : (
+        <>
+          <Icon className="size-4" />
+          {label}
+        </>
+      )}
+    </Button>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <CardContent>
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+        <p className="text-sm text-destructive">{message}</p>
+      </div>
+    </CardContent>
+  );
+}
+
 export function SrVendors({
   results,
   resultsLoading,
@@ -330,29 +375,16 @@ export function SrVendors({
               </CardDescription>
             </div>
             <CardAction>
-              <Button onClick={onReSearch} disabled={reSearchLoading}>
-                {reSearchLoading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Searching&hellip;
-                  </>
-                ) : (
-                  <>
-                    <Search className="size-4" />
-                    Find Vendors
-                  </>
-                )}
-              </Button>
+              <SearchButton
+                loading={reSearchLoading}
+                onClick={onReSearch}
+                label="Find Vendors"
+                icon={Search}
+              />
             </CardAction>
           </CardHeader>
 
-          {reSearchError && (
-            <CardContent>
-              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-                <p className="text-sm text-destructive">{reSearchError}</p>
-              </div>
-            </CardContent>
-          )}
+          {reSearchError && <ErrorBanner message={reSearchError} />}
         </Card>
       </TooltipProvider>
     );
@@ -368,28 +400,15 @@ export function SrVendors({
             <CardDescription>Search failed</CardDescription>
           </div>
           <CardAction>
-            <Button onClick={onReSearch} disabled={reSearchLoading}>
-              {reSearchLoading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Searching&hellip;
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="size-4" />
-                  Re-search
-                </>
-              )}
-            </Button>
+            <SearchButton
+              loading={reSearchLoading}
+              onClick={onReSearch}
+              label="Re-search"
+              icon={RefreshCw}
+            />
           </CardAction>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-            <p className="text-sm text-destructive">
-              The vendor search failed. Please try again.
-            </p>
-          </div>
-        </CardContent>
+        <ErrorBanner message="The vendor search failed. Please try again." />
       </Card>
     );
   }
@@ -406,33 +425,17 @@ export function SrVendors({
             </CardDescription>
           </div>
           <CardAction>
-            <Button
-              variant="outline"
+            <SearchButton
+              loading={reSearchLoading}
               onClick={onReSearch}
-              disabled={reSearchLoading}
-            >
-              {reSearchLoading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Searching&hellip;
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="size-4" />
-                  Re-search
-                </>
-              )}
-            </Button>
+              label="Re-search"
+              icon={RefreshCw}
+              variant="outline"
+            />
           </CardAction>
         </CardHeader>
 
-        {reSearchError && (
-          <CardContent>
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-              <p className="text-sm text-destructive">{reSearchError}</p>
-            </div>
-          </CardContent>
-        )}
+        {reSearchError && <ErrorBanner message={reSearchError} />}
 
         {candidates.length > 0 && (
           <CardContent className="px-0">
