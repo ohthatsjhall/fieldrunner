@@ -159,6 +159,46 @@ describe('SearchQueryGeneratorService', () => {
       expect(userMessage).toContain('Problem');
     });
 
+    it('should separate work fields from client context in the prompt', async () => {
+      mockCreate.mockResolvedValue({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              queries: ['plumber'],
+              category: 'Plumbing',
+              reasoning: 'test',
+            }),
+          },
+        ],
+      });
+
+      await service.generateSearchQueries(
+        makeSrDetail({
+          description: 'Plumbing – Leaking pipe',
+          customerName: 'Splash Car Wash',
+          customFields: [{ name: 'Category', value: 'Plumbing' }],
+        }),
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      const userMessage: string = callArgs.messages[0].content;
+
+      // Work fields appear under WORK NEEDED section
+      const workSection = userMessage.indexOf('WORK NEEDED');
+      const contextSection = userMessage.indexOf('CLIENT CONTEXT');
+      expect(workSection).toBeGreaterThan(-1);
+      expect(contextSection).toBeGreaterThan(workSection);
+
+      // Description and category appear before client context
+      const descPos = userMessage.indexOf('Plumbing – Leaking pipe');
+      const categoryPos = userMessage.indexOf('Category: Plumbing');
+      const customerPos = userMessage.indexOf('Splash Car Wash');
+      expect(descPos).toBeLessThan(contextSection);
+      expect(categoryPos).toBeLessThan(contextSection);
+      expect(customerPos).toBeGreaterThan(contextSection);
+    });
+
     it('should fall back to generic queries on API error', async () => {
       mockCreate.mockRejectedValue(new Error('API down'));
 
