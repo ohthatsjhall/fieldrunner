@@ -67,8 +67,8 @@ export function useBluefolderApiKey() {
 /**
  * Saves (creates or updates) the BlueFolder API key.
  *
- * On success, invalidates the key query so the UI reflects the new hint,
- * and also invalidates the full organization-settings subtree.
+ * On success, invalidates the organization-settings subtree (covers the
+ * key query and any future settings queries).
  *
  * @example
  *   const saveKey = useSaveBluefolderApiKey();

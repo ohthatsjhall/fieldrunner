@@ -31,7 +31,7 @@ const STATS_GC_TIME = 5 * 60_000;
 const LIST_STALE_TIME = 60_000;
 const LIST_GC_TIME = 5 * 60_000;
 
-/** Detail is read-heavy; allow 2 min staleness (user can pull-to-refresh). */
+/** Detail is read-heavy; allow 2 min staleness. Users see fresh data after sync. */
 const DETAIL_STALE_TIME = 2 * 60_000;
 const DETAIL_GC_TIME = 10 * 60_000;
 
@@ -162,10 +162,10 @@ export function useSyncStatus() {
 /**
  * Triggers a full BlueFolder sync.
  *
- * On success, invalidates:
- *   - `bluefolder.stats`           (counts change)
- *   - `bluefolder.serviceRequests` (list + all details/files)
- *   - `bluefolder.syncStatus`      (timestamp changes)
+ * On success:
+ *   - Optimistically sets `bluefolder.syncStatus` from the mutation response
+ *   - Invalidates `bluefolder.stats`           (triggers refetch)
+ *   - Invalidates `bluefolder.serviceRequests` (triggers refetch of list + details/files)
  *
  * The broad invalidation via `serviceRequests.all` covers the list AND every
  * cached detail/file query, so the user sees fresh data everywhere after sync.

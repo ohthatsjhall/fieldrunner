@@ -80,8 +80,9 @@ type UseApiMutationOptions<TData, TVariables> = Omit<
 /**
  * Generic hook that wires `apiFetch` as the `mutationFn` for React Query.
  *
- * The `TVariables` type is sent as the JSON body (for POST/PUT/PATCH) or
- * ignored (for DELETE). Use `onSuccess` to invalidate related queries.
+ * The `TVariables` type is sent as the JSON body (for POST/PUT/PATCH).
+ * For DELETE, variables are not included in the request body but are still
+ * available for dynamic path resolution. Use `onSuccess` to invalidate related queries.
  *
  * @example
  *   const sync = useApiMutation<void, void>({
@@ -105,7 +106,7 @@ export function useApiMutation<TData, TVariables = void>(
       const init: RequestInit = { method };
 
       // Only attach a body for methods that support it, and only if there
-      // are actually variables to send (TVariables !== void).
+      // are actually variables to send.
       if (
         method !== 'DELETE' &&
         variables !== undefined &&

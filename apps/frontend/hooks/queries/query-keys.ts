@@ -34,7 +34,7 @@ export const queryKeys = {
       all: (orgId: string) =>
         ['bluefolder', orgId, 'service-requests'] as const,
 
-      /** The paginated/filtered list. */
+      /** The full list of service requests. */
       list: (orgId: string) =>
         ['bluefolder', orgId, 'service-requests', 'list'] as const,
 

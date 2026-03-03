@@ -206,7 +206,7 @@ describe('BuildZoomProvider', () => {
     const provider = new BuildZoomProvider(firecrawl);
     await provider.search(makeParams());
 
-    // Only 10 URLs should be discovered and scraped
+    // MAX_DISCOVERED_URLS (10) caps discovery; all 10 are then scraped
     expect(firecrawl.scrapeJson).toHaveBeenCalledTimes(10);
   });
 
