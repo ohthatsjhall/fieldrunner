@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react';
-import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw } from 'lucide-react';
+import { useOrganization } from '@clerk/nextjs';
+import {
+  Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw,
+  MoreHorizontal, UserCheck, Paperclip,
+} from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -25,8 +29,28 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/app/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/dialog';
+import { Input } from '@/app/components/ui/input';
+import { Textarea } from '@/app/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { VendorCandidate, VendorSearchResponse } from '@fieldrunner/shared';
+import type {
+  ServiceRequestDetail,
+  VendorCandidate,
+  VendorSearchResponse,
+} from '@fieldrunner/shared';
 
 const PAGE_SIZE = 5;
 
@@ -66,6 +90,183 @@ function getScoreColor(score: number): string {
   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
 }
 
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+function getCustomField(fields: { name: string; value: string }[], ...names: string[]): string | undefined {
+  const lower = names.map((n) => n.toLowerCase());
+  const match = fields.find((f) => lower.includes(f.name.toLowerCase()));
+  return match?.value || undefined;
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return 'TBD';
+  return new Date(iso).toLocaleDateString();
+}
+
+function formatCurrency(amount: string | undefined): string {
+  if (!amount) return 'N/A';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return 'N/A';
+  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function buildEmailBody(sr: ServiceRequestDetail, vendorName: string, orgName: string): string {
+  const fullAddress = [
+    sr.customerLocationStreetAddress,
+    sr.customerLocationCity,
+    sr.customerLocationState,
+    sr.customerLocationPostalCode,
+  ].filter(Boolean).join(', ');
+
+  const nteAmount = formatCurrency(getCustomField(sr.customFields, 'NTE', 'NTE Amount'));
+  const contactName = sr.serviceManagerName || sr.accountManagerName || null;
+
+  return `Hi ${vendorName},
+
+Please find the attached work order for Job #${sr.serviceRequestId} at ${sr.customerLocationName}.
+
+Job Details:
+- Location: ${fullAddress || 'N/A'}
+- Description: ${sr.description}
+- Expected Completion: ${formatDate(sr.dueDate)}
+- NTE Amount: ${nteAmount}
+
+Please review and confirm your availability.${contactName ? ` If you have any questions, contact ${contactName} at ${orgName}.` : ''}
+
+Thank you,
+${orgName}`;
+}
+
+function buildAttachmentFilename(sr: ServiceRequestDetail): string {
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const customerPart = sr.customerName ? sanitizeFilename(sr.customerName) : 'Report';
+  return `WO-${sr.serviceRequestId}-${customerPart}-${dateStr}.pdf`;
+}
+
+// ---------------------------------------------------------------------------
+// AcceptVendorModal
+// ---------------------------------------------------------------------------
+
+function AcceptVendorModal({
+  open,
+  onOpenChange,
+  candidate,
+  sr,
+  orgName,
+  orgImageUrl,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  candidate: VendorCandidate;
+  sr: ServiceRequestDetail;
+  orgName: string;
+  orgImageUrl: string | null;
+}) {
+  const defaultTo = candidate.email ?? '';
+  const defaultSubject = `Work Order #${sr.serviceRequestId} - ${sr.customerLocationName} - ${orgName}`;
+  const defaultBody = buildEmailBody(sr, candidate.name, orgName);
+  const attachmentName = buildAttachmentFilename(sr);
+
+  const [to, setTo] = useState(defaultTo);
+  const [subject, setSubject] = useState(defaultSubject);
+  const [body, setBody] = useState(defaultBody);
+  const [downloading, setDownloading] = useState(false);
+
+  // Reset fields when modal opens with a different candidate
+  const prevCandidateId = useRef(candidate.vendorId);
+  if (candidate.vendorId !== prevCandidateId.current) {
+    prevCandidateId.current = candidate.vendorId;
+    setTo(candidate.email ?? '');
+    setSubject(`Work Order #${sr.serviceRequestId} - ${sr.customerLocationName} - ${orgName}`);
+    setBody(buildEmailBody(sr, candidate.name, orgName));
+  }
+
+  async function handleDownloadPdf() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const { downloadSrPdf } = await import('./pdf/download-sr-pdf');
+      await downloadSrPdf({ sr, orgName, orgImageUrl });
+    } catch (err) {
+      console.error('[AcceptVendorModal] PDF generation failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Dispatch Work Order</DialogTitle>
+          <DialogDescription>{candidate.name}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label htmlFor="dispatch-to" className="text-sm font-medium">To</label>
+            <Input
+              id="dispatch-to"
+              type="email"
+              placeholder="vendor@example.com"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="dispatch-subject" className="text-sm font-medium">Subject</label>
+            <Input
+              id="dispatch-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="dispatch-body" className="text-sm font-medium">Body</label>
+            <Textarea
+              id="dispatch-body"
+              rows={10}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            className="flex w-full items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            {downloading ? (
+              <Loader2 className="size-4 shrink-0 animate-spin" />
+            ) : (
+              <Paperclip className="size-4 shrink-0" />
+            )}
+            <span className="truncate">{attachmentName}</span>
+          </button>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Discard
+          </Button>
+          <Button onClick={() => onOpenChange(false)}>
+            Send
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CategoryTags
+// ---------------------------------------------------------------------------
+
 function CategoryTags({ categories }: { categories: string[] }) {
   const filtered = filterCategories(categories);
   if (filtered.length === 0) return null;
@@ -90,124 +291,170 @@ function CategoryTags({ categories }: { categories: string[] }) {
   );
 }
 
-function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
+// ---------------------------------------------------------------------------
+// VendorRow
+// ---------------------------------------------------------------------------
+
+function VendorRow({
+  candidate: c,
+  sr,
+  orgName,
+  orgImageUrl,
+}: {
+  candidate: VendorCandidate;
+  sr: ServiceRequestDetail;
+  orgName: string;
+  orgImageUrl: string | null;
+}) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <TableRow className="cursor-default">
-      <TableCell className="text-center font-mono text-sm text-muted-foreground">
-        {c.rank}
-      </TableCell>
+    <>
+      <TableRow className="cursor-default">
+        <TableCell className="text-center font-mono text-sm text-muted-foreground">
+          {c.rank}
+        </TableCell>
 
-      <TableCell>
-        <div className="flex flex-col gap-1">
-          <span className="font-medium">{c.name}</span>
-          {c.address && (
-            <span className="text-xs text-muted-foreground">{c.address}</span>
-          )}
-          {c.categories && c.categories.length > 0 && (
-            <CategoryTags categories={c.categories} />
-          )}
-        </div>
-      </TableCell>
-
-      <TableCell className="text-center">
-        {c.rating != null ? (
-          <div className="inline-flex items-center gap-1.5">
-            <Star className="size-3.5 shrink-0 fill-amber-400 text-amber-400" />
-            <span className="text-sm font-medium">{c.rating.toFixed(1)}</span>
-            {c.reviewCount != null && (
-              <span className="text-xs text-muted-foreground">
-                ({c.reviewCount})
-              </span>
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{c.name}</span>
+            {c.address && (
+              <span className="text-xs text-muted-foreground">{c.address}</span>
+            )}
+            {c.categories && c.categories.length > 0 && (
+              <CategoryTags categories={c.categories} />
             )}
           </div>
-        ) : (
-          <span className="text-xs text-muted-foreground">&mdash;</span>
-        )}
-      </TableCell>
+        </TableCell>
 
-      <TableCell className="whitespace-nowrap text-center">
-        {c.distanceMeters != null ? (
-          <span className="text-sm">
-            {metersToMiles(c.distanceMeters)} mi
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">&mdash;</span>
-        )}
-      </TableCell>
-
-      <TableCell className="text-center">
-        <div
-          className={cn(
-            'mx-auto inline-flex h-7 w-12 items-center justify-center rounded-md text-sm font-semibold',
-            getScoreColor(c.score),
-          )}
-        >
-          {Math.round(c.score)}
-        </div>
-      </TableCell>
-
-      <TableCell className="text-center">
-        <div className="inline-flex items-center gap-1">
-          <CopyPhoneButton phone={phoneDisplay} name={c.name} />
-
-          {c.email ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" asChild>
-                  <a
-                    href={`mailto:${c.email}`}
-                    aria-label={`Email ${c.name}`}
-                  >
-                    <Mail className="size-4" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">{c.email}</TooltipContent>
-            </Tooltip>
+        <TableCell className="text-center">
+          {c.rating != null ? (
+            <div className="inline-flex items-center gap-1.5">
+              <Star className="size-3.5 shrink-0 fill-amber-400 text-amber-400" />
+              <span className="text-sm font-medium">{c.rating.toFixed(1)}</span>
+              {c.reviewCount != null && (
+                <span className="text-xs text-muted-foreground">
+                  ({c.reviewCount})
+                </span>
+              )}
+            </div>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label="No email"
-            >
-              <Mail className="size-4" />
-            </Button>
+            <span className="text-xs text-muted-foreground">&mdash;</span>
           )}
+        </TableCell>
 
-          {c.website ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" asChild>
-                  <a
-                    href={c.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Visit ${c.name} website`}
-                  >
-                    <Globe className="size-4" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Visit website</TooltipContent>
-            </Tooltip>
+        <TableCell className="whitespace-nowrap text-center">
+          {c.distanceMeters != null ? (
+            <span className="text-sm">
+              {metersToMiles(c.distanceMeters)} mi
+            </span>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label="No website"
-            >
-              <Globe className="size-4" />
-            </Button>
+            <span className="text-xs text-muted-foreground">&mdash;</span>
           )}
-        </div>
-      </TableCell>
-    </TableRow>
+        </TableCell>
+
+        <TableCell className="text-center">
+          <div
+            className={cn(
+              'mx-auto inline-flex h-7 w-12 items-center justify-center rounded-md text-sm font-semibold',
+              getScoreColor(c.score),
+            )}
+          >
+            {Math.round(c.score)}
+          </div>
+        </TableCell>
+
+        <TableCell className="text-center">
+          <div className="inline-flex items-center gap-1">
+            <CopyPhoneButton phone={phoneDisplay} name={c.name} />
+
+            {c.email ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" asChild>
+                    <a
+                      href={`mailto:${c.email}`}
+                      aria-label={`Email ${c.name}`}
+                    >
+                      <Mail className="size-4" />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{c.email}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                aria-label="No email"
+              >
+                <Mail className="size-4" />
+              </Button>
+            )}
+
+            {c.website ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" asChild>
+                    <a
+                      href={c.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Visit ${c.name} website`}
+                    >
+                      <Globe className="size-4" />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Visit website</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                aria-label="No website"
+              >
+                <Globe className="size-4" />
+              </Button>
+            )}
+          </div>
+        </TableCell>
+
+        <TableCell className="text-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setModalOpen(true)}>
+                <UserCheck className="size-4" />
+                Accept Vendor
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+
+      <AcceptVendorModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        candidate={c}
+        sr={sr}
+        orgName={orgName}
+        orgImageUrl={orgImageUrl}
+      />
+    </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// CopyPhoneButton
+// ---------------------------------------------------------------------------
 
 function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
   const [copied, setCopied] = useState(false);
@@ -256,6 +503,10 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// SearchButton / ErrorBanner
+// ---------------------------------------------------------------------------
+
 function SearchButton({
   loading,
   onClick,
@@ -296,19 +547,29 @@ function ErrorBanner({ message }: { message: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// SrVendors (main export)
+// ---------------------------------------------------------------------------
+
 export function SrVendors({
+  sr,
   results,
   resultsLoading,
   onReSearch,
   reSearchLoading,
   reSearchError,
 }: {
+  sr: ServiceRequestDetail;
   results: VendorSearchResponse | null;
   resultsLoading: boolean;
   onReSearch: () => void;
   reSearchLoading: boolean;
   reSearchError: string | null;
 }) {
+  const { organization } = useOrganization();
+  const orgName = organization?.name ?? 'Organization';
+  const orgImageUrl = organization?.imageUrl ?? null;
+
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const prevSessionId = useRef(results?.sessionId);
   if (results?.sessionId !== prevSessionId.current) {
@@ -462,12 +723,13 @@ export function SrVendors({
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead className="text-center">Contact</TableHead>
+                  <TableHead className="w-16 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {visible.map((c) => (
-                  <VendorRow key={c.vendorId} candidate={c} />
+                  <VendorRow key={c.vendorId} candidate={c} sr={sr} orgName={orgName} orgImageUrl={orgImageUrl} />
                 ))}
               </TableBody>
             </Table>
