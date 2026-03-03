@@ -55,6 +55,10 @@ export const queryKeys = {
     /** Search sessions list. */
     sessions: (orgId: string) =>
       ['vendor-sourcing', orgId, 'sessions'] as const,
+
+    /** Cached results for a specific SR. */
+    results: (orgId: string, bluefolderId: number) =>
+      ['vendor-sourcing', orgId, 'results', bluefolderId] as const,
   },
 
   organizationSettings: {

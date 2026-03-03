@@ -30,8 +30,8 @@ export {
 // Vendor sourcing domain
 export {
   useVendorSearchSessions,
+  useVendorSearchResults,
   useVendorSearch,
-  useLoadMoreVendors,
 } from './use-vendor-sourcing';
 
 // Organization settings domain

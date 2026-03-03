@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -27,6 +27,8 @@ import {
 } from '@/app/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { VendorCandidate, VendorSearchResponse } from '@fieldrunner/shared';
+
+const PAGE_SIZE = 5;
 
 function metersToMiles(meters: number): string {
   return (meters / 1609.34).toFixed(1);
@@ -236,22 +238,149 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
 }
 
 export function SrVendors({
-  onSearch,
-  loading,
-  error,
-  result,
-  onLoadMore,
-  loadingMore,
+  results,
+  resultsLoading,
+  onReSearch,
+  reSearchLoading,
+  reSearchError,
 }: {
-  onSearch: () => void;
-  loading: boolean;
-  error: string | null;
-  result: VendorSearchResponse | null;
-  onLoadMore?: () => void;
-  loadingMore?: boolean;
+  results: VendorSearchResponse | null;
+  resultsLoading: boolean;
+  onReSearch: () => void;
+  reSearchLoading: boolean;
+  reSearchError: string | null;
 }) {
-  const candidates = result?.candidates ?? [];
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const candidates = results?.candidates ?? [];
+  const visible = candidates.slice(0, visibleCount);
+  const hasMoreToShow = visibleCount < candidates.length;
 
+  // Reset visible count when results change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [results?.sessionId]);
+
+  // Loading skeleton while initial fetch is in progress
+  if (resultsLoading && !results) {
+    return (
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Vendor Search</CardTitle>
+            <CardDescription>Loading vendor results&hellip;</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // In-progress state (auto-search running)
+  if (results?.status === 'in_progress') {
+    return (
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Vendor Search</CardTitle>
+            <CardDescription>
+              Searching for local vendors&hellip;
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="mb-3 size-6 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Auto-searching for vendors. This may take a minute.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // No results yet — show "Find Vendors" button
+  if (!results) {
+    return (
+      <TooltipProvider>
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Vendor Search</CardTitle>
+              <CardDescription>
+                Find local vendors for this service request
+              </CardDescription>
+            </div>
+            <CardAction>
+              <Button onClick={onReSearch} disabled={reSearchLoading}>
+                {reSearchLoading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Searching&hellip;
+                  </>
+                ) : (
+                  <>
+                    <Search className="size-4" />
+                    Find Vendors
+                  </>
+                )}
+              </Button>
+            </CardAction>
+          </CardHeader>
+
+          {reSearchError && (
+            <CardContent>
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                <p className="text-sm text-destructive">{reSearchError}</p>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </TooltipProvider>
+    );
+  }
+
+  // Failed state
+  if (results.status === 'failed') {
+    return (
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Vendor Search</CardTitle>
+            <CardDescription>Search failed</CardDescription>
+          </div>
+          <CardAction>
+            <Button onClick={onReSearch} disabled={reSearchLoading}>
+              {reSearchLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Searching&hellip;
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="size-4" />
+                  Re-search
+                </>
+              )}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+            <p className="text-sm text-destructive">
+              The vendor search failed. Please try again.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Completed with results
   return (
     <TooltipProvider>
       <Card>
@@ -263,31 +392,35 @@ export function SrVendors({
             </CardDescription>
           </div>
           <CardAction>
-            <Button onClick={onSearch} disabled={loading}>
-              {loading ? (
+            <Button
+              variant="outline"
+              onClick={onReSearch}
+              disabled={reSearchLoading}
+            >
+              {reSearchLoading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   Searching&hellip;
                 </>
               ) : (
                 <>
-                  <Search className="size-4" />
-                  {result ? 'Re-search' : 'Find Vendors'}
+                  <RefreshCw className="size-4" />
+                  Re-search
                 </>
               )}
             </Button>
           </CardAction>
         </CardHeader>
 
-        {error && (
+        {reSearchError && (
           <CardContent>
             <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive">{reSearchError}</p>
             </div>
           </CardContent>
         )}
 
-        {result && candidates.length > 0 && (
+        {candidates.length > 0 && (
           <CardContent className="px-0">
             <Table>
               <TableHeader>
@@ -316,35 +449,27 @@ export function SrVendors({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {candidates.map((c) => (
+                {visible.map((c) => (
                   <VendorRow key={c.vendorId} candidate={c} />
                 ))}
               </TableBody>
             </Table>
-            {result?.hasMore && onLoadMore && (
+            {hasMoreToShow && (
               <div className="flex justify-center px-4 pt-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-xs text-muted-foreground"
-                  disabled={loadingMore}
-                  onClick={onLoadMore}
+                  onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
                 >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Loading&hellip;
-                    </>
-                  ) : (
-                    'Load more vendors'
-                  )}
+                  Show more ({candidates.length - visibleCount} remaining)
                 </Button>
               </div>
             )}
           </CardContent>
         )}
 
-        {result && candidates.length === 0 && (
+        {candidates.length === 0 && (
           <CardContent>
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Search className="mb-3 size-8 text-muted-foreground/50" />
@@ -356,15 +481,13 @@ export function SrVendors({
           </CardContent>
         )}
 
-        {result && (
-          <CardFooter className="text-xs text-muted-foreground">
-            {result.resultCount}{' '}
-            {result.resultCount === 1 ? 'result' : 'results'}
-            {result.searchAddress && ` near ${result.searchAddress}`}
-            {result.durationMs != null &&
-              ` \u00B7 ${(result.durationMs / 1000).toFixed(1)}s`}
-          </CardFooter>
-        )}
+        <CardFooter className="text-xs text-muted-foreground">
+          {results.resultCount}{' '}
+          {results.resultCount === 1 ? 'result' : 'results'}
+          {results.searchAddress && ` near ${results.searchAddress}`}
+          {results.durationMs != null &&
+            ` \u00B7 ${(results.durationMs / 1000).toFixed(1)}s`}
+        </CardFooter>
       </Card>
     </TooltipProvider>
   );

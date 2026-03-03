@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import {
   useServiceRequestDetail,
   useServiceRequestFiles,
+  useVendorSearchResults,
   useVendorSearch,
-  useLoadMoreVendors,
 } from '@/hooks/queries';
-import type { VendorCandidate } from '@fieldrunner/shared';
 
 import { SrLoading } from './components/sr-loading';
 import { SrHeader } from './components/sr-header';
@@ -17,6 +16,7 @@ import { SrOverview } from './components/sr-overview';
 import { SrFilesTab } from './components/sr-files-tab';
 import { SrHistoryTab } from './components/sr-history-tab';
 import { SrVendors } from './components/sr-vendors';
+import { SrQuickActions } from './components/sr-quick-actions';
 
 export default function ServiceRequestDetailPage() {
   const params = useParams<{ slug: string; id: string }>();
@@ -26,33 +26,11 @@ export default function ServiceRequestDetailPage() {
   const [filesEnabled, setFilesEnabled] = useState(false);
   const { data: files = [], isLoading: filesLoading, error: filesError } =
     useServiceRequestFiles(bluefolderId, filesEnabled);
-  const vendorSearch = useVendorSearch();
-  const loadMore = useLoadMoreVendors();
-
-  // Accumulate candidates across search + load-more calls
-  const [allCandidates, setAllCandidates] = useState<VendorCandidate[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const lastSessionId = useRef<string | null>(null);
-  const lastLoadMoreData = useRef<typeof loadMore.data>(undefined);
-
-  // Reset on new search result
-  useEffect(() => {
-    if (vendorSearch.data && vendorSearch.data.sessionId !== lastSessionId.current) {
-      lastSessionId.current = vendorSearch.data.sessionId;
-      lastLoadMoreData.current = undefined;
-      setAllCandidates(vendorSearch.data.candidates);
-      setHasMore(vendorSearch.data.hasMore ?? false);
-    }
-  }, [vendorSearch.data]);
-
-  // Append on load-more success (guard against duplicate appends)
-  useEffect(() => {
-    if (loadMore.data && loadMore.data !== lastLoadMoreData.current) {
-      lastLoadMoreData.current = loadMore.data;
-      setAllCandidates((prev) => [...prev, ...loadMore.data!.candidates]);
-      setHasMore(loadMore.data.hasMore);
-    }
-  }, [loadMore.data]);
+  const {
+    data: vendorResults,
+    isLoading: resultsLoading,
+  } = useVendorSearchResults(bluefolderId);
+  const vendorSearch = useVendorSearch(bluefolderId);
 
   function handleTabChange(value: string) {
     if (value === 'files') setFilesEnabled(true);
@@ -79,11 +57,14 @@ export default function ServiceRequestDetailPage() {
       <SrHeader sr={sr} slug={params.slug} />
 
       <Tabs defaultValue="overview" onValueChange={handleTabChange}>
-        <TabsList variant="line">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList variant="line">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="files">Files</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+          <SrQuickActions sr={sr} />
+        </div>
 
         <TabsContent value="overview">
           <SrOverview
@@ -91,29 +72,15 @@ export default function ServiceRequestDetailPage() {
             vendors={
               sr.status.toLowerCase() === 'assigned' ? (
                 <SrVendors
-                  onSearch={() =>
+                  results={vendorResults ?? null}
+                  resultsLoading={resultsLoading}
+                  onReSearch={() =>
                     vendorSearch.mutate({
                       serviceRequestBluefolderId: sr.serviceRequestId,
                     })
                   }
-                  loading={vendorSearch.isPending}
-                  error={vendorSearch.error?.message ?? null}
-                  result={
-                    vendorSearch.data
-                      ? {
-                          ...vendorSearch.data,
-                          candidates: allCandidates,
-                          resultCount: allCandidates.length,
-                          hasMore,
-                        }
-                      : null
-                  }
-                  onLoadMore={() => {
-                    if (lastSessionId.current) {
-                      loadMore.mutate({ sessionId: lastSessionId.current });
-                    }
-                  }}
-                  loadingMore={loadMore.isPending}
+                  reSearchLoading={vendorSearch.isPending}
+                  reSearchError={vendorSearch.error?.message ?? null}
                 />
               ) : null
             }
