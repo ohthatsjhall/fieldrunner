@@ -286,7 +286,7 @@ describe('VendorSourcingService', () => {
       expect(result.candidates.length).toBeGreaterThan(0);
       expect(result.candidates[0].rank).toBe(1);
       expect(result.candidates[0].score).toBeGreaterThan(0);
-      expect(result.hasMore).toBe(true);
+      expect(result.hasMore).toBe(false);
       expect(mockEmailEnrichment.enrichPlaces).toHaveBeenCalledTimes(1);
     });
 
@@ -434,7 +434,7 @@ describe('VendorSourcingService', () => {
       }
     });
 
-    it('should return hasMore: true when pending URLs exist', async () => {
+    it('should scrape all BuildZoom URLs upfront and return hasMore: false', async () => {
       mockBuildZoom.discoverProfileUrls.mockResolvedValue([
         'https://www.buildzoom.com/contractor/bz-1',
         'https://www.buildzoom.com/contractor/bz-2',
@@ -449,7 +449,14 @@ describe('VendorSourcingService', () => {
         serviceRequestBluefolderId: 2270,
       });
 
-      expect(result.hasMore).toBe(true);
+      expect(result.hasMore).toBe(false);
+      // All 7 URLs should be passed to scrapeProfiles
+      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'https://www.buildzoom.com/contractor/bz-6',
+          'https://www.buildzoom.com/contractor/bz-7',
+        ]),
+      );
     });
 
     it('should return hasMore: false when no pending URLs', async () => {

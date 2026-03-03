@@ -1,4 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { eq, desc, sql, isNotNull, and, isNull } from 'drizzle-orm';
 import type { ServiceRequestStats } from '@fieldrunner/shared';
@@ -37,6 +38,7 @@ export class ServiceRequestsService {
     private readonly blueFolderService: BlueFolderService,
     private readonly usersService: BlueFolderUsersService,
     private readonly settingsService: OrganizationSettingsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async sync(clerkOrgId: string): Promise<SyncResult> {
@@ -115,6 +117,9 @@ export class ServiceRequestsService {
       clerkOrgId,
       total: items.length,
     });
+
+    // Fire-and-forget: trigger auto vendor search for newly assigned SRs
+    this.eventEmitter.emit('sync.completed', { clerkOrgId, organizationId });
 
     return { total: items.length, syncedAt };
   }

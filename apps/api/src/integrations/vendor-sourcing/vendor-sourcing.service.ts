@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, and, max, inArray } from 'drizzle-orm';
+import { eq, and, max, inArray, desc } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
   vendors,
@@ -29,6 +29,7 @@ import type {
   VendorSearchResponse,
   VendorCandidate,
   LoadMoreVendorsResponse,
+  ValidEmail,
 } from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../core/database/schema';
@@ -350,15 +351,12 @@ export class VendorSourcingService {
     const allUrls = await this.buildZoom.discoverProfileUrls(params);
     if (allUrls.length === 0) return { places: [], pendingUrls: [] };
 
-    const initialUrls = allUrls.slice(0, 5);
-    const pendingUrls = allUrls.slice(5);
-
     this.logger.log(
-      `BuildZoom URLs: ${allUrls.length} discovered, ${initialUrls.length} to scrape, ${pendingUrls.length} pending`,
+      `BuildZoom URLs: ${allUrls.length} discovered, scraping all`,
     );
 
-    const places = await this.buildZoom.scrapeProfiles(initialUrls);
-    return { places, pendingUrls };
+    const places = await this.buildZoom.scrapeProfiles(allUrls);
+    return { places, pendingUrls: [] };
   }
 
   async getSession(organizationId: string, sessionId: string) {
@@ -392,6 +390,112 @@ export class VendorSourcingService {
       session: sessions[0],
       results,
       vendors: vendorRows,
+    };
+  }
+
+  async getResultsByServiceRequest(
+    clerkOrgId: string,
+    bluefolderId: number,
+  ): Promise<VendorSearchResponse | null> {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Find internal SR ID
+    const srRows = await this.db
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(
+        and(
+          eq(serviceRequests.organizationId, organizationId),
+          eq(serviceRequests.bluefolderId, bluefolderId),
+        ),
+      );
+
+    const serviceRequestId = srRows[0]?.id;
+    if (!serviceRequestId) return null;
+
+    // Find latest session for this SR
+    const sessions = await this.db
+      .select()
+      .from(vendorSearchSessions)
+      .where(eq(vendorSearchSessions.serviceRequestId, serviceRequestId))
+      .orderBy(desc(vendorSearchSessions.createdAt))
+      .limit(1);
+
+    const session = sessions[0];
+    if (!session) return null;
+
+    // If still in progress, return status without candidates
+    if (session.status === 'in_progress') {
+      return {
+        sessionId: session.id,
+        status: 'in_progress',
+        searchQuery: session.searchQuery,
+        searchAddress: session.searchAddress,
+        resultCount: 0,
+        durationMs: null,
+        candidates: [],
+        hasMore: false,
+      };
+    }
+
+    // Fetch results joined with vendors
+    const results = await this.db
+      .select()
+      .from(vendorSearchResults)
+      .where(eq(vendorSearchResults.searchSessionId, session.id));
+
+    const vendorIds = results.map((r) => r.vendorId);
+    const vendorRows =
+      vendorIds.length > 0
+        ? await this.db
+            .select()
+            .from(vendors)
+            .where(inArray(vendors.id, vendorIds))
+        : [];
+
+    const vendorMap = new Map(vendorRows.map((v) => [v.id, v]));
+
+    // Map DB rows to VendorCandidate[]
+    const candidates: VendorCandidate[] = results
+      .sort((a, b) => a.rank - b.rank)
+      .map((r) => {
+        const v = vendorMap.get(r.vendorId);
+        return {
+          vendorId: r.vendorId,
+          rank: r.rank,
+          score: Number(r.score),
+          name: v?.name ?? '',
+          phone: v?.phone ?? null,
+          phoneRaw: v?.phoneRaw ?? null,
+          address: v?.address ?? null,
+          website: v?.website ?? null,
+          email: (v?.email as ValidEmail) ?? null,
+          rating: v?.rating != null ? Number(v.rating) : null,
+          reviewCount: v?.reviewCount ?? null,
+          distanceMeters: r.distanceMeters != null ? Number(r.distanceMeters) : null,
+          categories: (v?.categories as string[]) ?? null,
+          googlePlaceId: v?.googlePlaceId ?? null,
+          sources: [],
+          scores: {
+            distance: r.distanceScore != null ? Number(r.distanceScore) : null,
+            rating: r.ratingScore != null ? Number(r.ratingScore) : null,
+            reviewCount: r.reviewCountScore != null ? Number(r.reviewCountScore) : null,
+            categoryMatch: r.categoryMatchScore != null ? Number(r.categoryMatchScore) : null,
+            businessHours: r.businessHoursScore != null ? Number(r.businessHoursScore) : null,
+            credential: r.credentialScore != null ? Number(r.credentialScore) : null,
+          },
+        };
+      });
+
+    return {
+      sessionId: session.id,
+      status: session.status as VendorSearchResponse['status'],
+      searchQuery: session.searchQuery,
+      searchAddress: session.searchAddress,
+      resultCount: session.resultCount,
+      durationMs: session.durationMs,
+      candidates,
+      hasMore: false,
     };
   }
 

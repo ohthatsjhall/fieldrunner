@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './core/auth/auth.module';
@@ -63,6 +64,7 @@ import { validate } from './config/env.validation';
         };
       },
     }),
+    EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     DatabaseModule,
     AuthModule,
