@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Inject } from '@nestjs/common';
 import { eq, and, inArray } from 'drizzle-orm';
+import { SYNC_COMPLETED } from '../../common/events/sync.events';
+import type { SyncCompletedEvent } from '../../common/events/sync.events';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
   serviceRequests,
@@ -21,11 +22,8 @@ export class VendorAutoSearchListener {
     private readonly vendorSourcingService: VendorSourcingService,
   ) {}
 
-  @OnEvent('sync.completed', { async: true })
-  async handleSyncCompleted(payload: {
-    clerkOrgId: string;
-    organizationId: string;
-  }) {
+  @OnEvent(SYNC_COMPLETED, { async: true })
+  async handleSyncCompleted(payload: SyncCompletedEvent) {
     const { clerkOrgId, organizationId } = payload;
 
     try {
@@ -78,7 +76,7 @@ export class VendorAutoSearchListener {
           );
         }
 
-        // Rate limit: 5s delay between searches
+        // Rate limit: 5s delay between searches to avoid overwhelming external APIs (Google Places, Nominatim, BuildZoom)
         if (i < needsSearch.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }

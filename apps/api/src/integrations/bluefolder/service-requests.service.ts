@@ -13,6 +13,7 @@ import {
 import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
+import { SYNC_COMPLETED } from '../../common/events/sync.events';
 
 export interface SyncResult {
   total: number;
@@ -118,8 +119,8 @@ export class ServiceRequestsService {
       total: items.length,
     });
 
-    // Fire-and-forget: trigger auto vendor search for newly assigned SRs
-    this.eventEmitter.emit('sync.completed', { clerkOrgId, organizationId });
+    // Fire-and-forget: auto vendor search runs in VendorAutoSearchListener (errors logged there, not propagated)
+    this.eventEmitter.emit(SYNC_COMPLETED, { clerkOrgId, organizationId });
 
     return { total: items.length, syncedAt };
   }

@@ -6,6 +6,7 @@ import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
+import { SYNC_COMPLETED } from '../../common/events/sync.events';
 import type { ServiceRequestSummary } from '@fieldrunner/shared';
 
 function makeSummary(
@@ -200,6 +201,27 @@ describe('ServiceRequestsService', () => {
 
       const upsertedRows = mockDb.values.mock.calls[0][0];
       expect(upsertedRows[0].assigneeName).toBe(expected);
+    });
+
+    it('should emit sync.completed event with clerkOrgId and organizationId', async () => {
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary(),
+      ]);
+
+      await service.sync(clerkOrgId);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(SYNC_COMPLETED, {
+        clerkOrgId,
+        organizationId: internalOrgId,
+      });
+    });
+
+    it('should not emit sync.completed when no items to sync', async () => {
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([]);
+
+      await service.sync(clerkOrgId);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('should continue SR sync even if user sync fails', async () => {
