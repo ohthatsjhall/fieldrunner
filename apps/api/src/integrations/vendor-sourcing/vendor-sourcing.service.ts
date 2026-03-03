@@ -175,8 +175,12 @@ export class VendorSourcingService {
       // Collect Google results
       const allPlaces: NormalizedPlace[] = [];
       const seenPhones = new Set<string>();
+      let googleCount = 0;
+      let bzRawCount = 0;
+      let bzDedupedCount = 0;
 
       if (googleResult.status === 'fulfilled') {
+        googleCount = googleResult.value.length;
         for (const p of googleResult.value) {
           allPlaces.push(p);
           const norm = normalizePhone(p.phone);
@@ -191,10 +195,12 @@ export class VendorSourcingService {
       if (buildZoomResult.status === 'fulfilled') {
         const { places: bzPlaces, pendingUrls } = buildZoomResult.value;
         pendingProfileUrls = pendingUrls;
+        bzRawCount = bzPlaces.length;
 
         if (bzPlaces.length > 0) {
           sourceCounts['buildzoom'] = bzPlaces.length;
           const dedupedBz = this.deduplicateByPhone(bzPlaces, seenPhones);
+          bzDedupedCount = dedupedBz.length;
           await this.geocodeMissingCoordinates(dedupedBz);
           allPlaces.push(...dedupedBz);
         }
@@ -203,7 +209,10 @@ export class VendorSourcingService {
       }
 
       // 5. Enrich emails from vendor websites (best-effort)
+      const emailsBefore = allPlaces.filter((p) => p.email !== null).length;
       await this.emailEnrichment.enrichPlaces(allPlaces);
+      const emailsAfter = allPlaces.filter((p) => p.email !== null).length;
+      const emailsFound = emailsAfter - emailsBefore;
 
       // 6. Deduplicate and upsert vendors
       const vendorIds = await this.upsertVendors(organizationId, allPlaces);
@@ -248,9 +257,39 @@ export class VendorSourcingService {
         })
         .where(eq(vendorSearchSessions.id, session.id));
 
-      this.logger.log(
-        `Search complete: ${ranked.length} ranked, ${pendingProfileUrls.length} pending URLs`,
-      );
+      // Detailed search summary
+      const emailVendors = allPlaces
+        .filter((p) => p.email !== null)
+        .map((p) => `${p.name} <${p.email}>`);
+
+      this.logger.log([
+        `\n========== VENDOR SEARCH COMPLETE ==========`,
+        `Session:     ${session.id}`,
+        `Query:       ${searchQueries.join(' | ')}`,
+        `Address:     ${address}`,
+        `Duration:    ${(durationMs / 1000).toFixed(1)}s`,
+        ``,
+        `--- Sources ---`,
+        `Google Places: ${googleCount} vendor(s)`,
+        `BuildZoom:     ${bzRawCount} scraped → ${bzDedupedCount} after phone dedup`,
+        `Combined:      ${allPlaces.length} unique vendor(s)`,
+        ``,
+        `--- Email Enrichment ---`,
+        `Attempted:   ${allPlaces.filter((p) => p.email === null && p.website !== null).length + emailsFound} vendor(s) with websites`,
+        `Found:       ${emailsFound} new email(s)`,
+        emailVendors.length > 0
+          ? `Emails:      ${emailVendors.join(', ')}`
+          : `Emails:      none`,
+        ``,
+        `--- Scoring ---`,
+        `Ranked:      ${ranked.length} vendor(s)`,
+        `Top 5:       ${ranked.slice(0, 5).map((r) => {
+          const idx = vendorIds.indexOf(r.id);
+          const name = idx >= 0 ? allPlaces[idx]?.name : 'unknown';
+          return `${name} (${r.scored.totalScore.toFixed(1)})`;
+        }).join(', ')}`,
+        `============================================`,
+      ].join('\n'));
 
       // 10. Build response
       const candidates = this.buildCandidates(
