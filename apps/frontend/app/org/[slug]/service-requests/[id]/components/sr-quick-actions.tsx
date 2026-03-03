@@ -26,6 +26,9 @@ export function SrQuickActions({ sr }: { sr: ServiceRequestDetail }) {
         orgName: organization?.name ?? 'Organization',
         orgImageUrl: organization?.imageUrl ?? null,
       });
+    } catch (err) {
+      console.error('[SrQuickActions] PDF generation failed:', err);
+      alert('Failed to generate PDF. Please try again.');
     } finally {
       setGenerating(false);
     }
@@ -36,15 +39,15 @@ export function SrQuickActions({ sr }: { sr: ServiceRequestDetail }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
           Actions
-          <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+          <ChevronDown className="ml-1.5 size-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={handleDownloadPdf} disabled={generating}>
           {generating ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 size-4 animate-spin" />
           ) : (
-            <FileDown className="mr-2 h-4 w-4" />
+            <FileDown className="mr-2 size-4" />
           )}
           Download PDF
         </DropdownMenuItem>
