@@ -72,15 +72,16 @@ describe('NominatimProvider', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when fetch fails', async () => {
+    it('should throw when fetch returns non-OK status', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
       });
 
-      const result = await provider.geocode('123 Main St');
-      expect(result).toBeNull();
+      await expect(provider.geocode('123 Main St')).rejects.toThrow(
+        'Nominatim geocode failed: 500 Internal Server Error',
+      );
     });
 
     it('should include User-Agent header from config', async () => {

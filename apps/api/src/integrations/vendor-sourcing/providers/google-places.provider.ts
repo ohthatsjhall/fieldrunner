@@ -61,29 +61,23 @@ export class GooglePlacesProvider implements PlaceProvider {
       maxResultCount: 20,
     };
 
-    try {
-      const response = await fetch(PLACES_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': this.apiKey,
-          'X-Goog-FieldMask': FIELD_MASK,
-        },
-        body: JSON.stringify(body),
-      });
+    const response = await fetch(PLACES_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': FIELD_MASK,
+      },
+      body: JSON.stringify(body),
+    });
 
-      if (!response.ok) {
-        this.logger.warn(
-          `Google Places search failed: ${response.status} ${response.statusText}`,
-        );
-        return [];
-      }
-
-      const data: GooglePlacesTextSearchResponse = await response.json();
-      return (data.places ?? []).map(mapGooglePlace);
-    } catch (error) {
-      this.logger.error('Google Places search error', error);
-      return [];
+    if (!response.ok) {
+      throw new Error(
+        `Google Places search failed: ${response.status} ${response.statusText}`,
+      );
     }
+
+    const data: GooglePlacesTextSearchResponse = await response.json();
+    return (data.places ?? []).map(mapGooglePlace);
   }
 }

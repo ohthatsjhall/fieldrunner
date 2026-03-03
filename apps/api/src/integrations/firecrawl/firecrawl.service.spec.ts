@@ -101,7 +101,7 @@ describe('FirecrawlService', () => {
       });
     });
 
-    it('should return null on non-200 response', async () => {
+    it('should throw on non-200 response', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -109,26 +109,29 @@ describe('FirecrawlService', () => {
       });
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.scrape('https://example.com');
-      expect(result).toBeNull();
+      await expect(service.scrape('https://example.com')).rejects.toThrow(
+        'Firecrawl /scrape failed: 429 Too Many Requests',
+      );
     });
 
-    it('should return null on timeout (AbortError)', async () => {
+    it('should throw on timeout (AbortError)', async () => {
       const abortError = new Error('The operation was aborted');
       abortError.name = 'AbortError';
       mockFetch.mockRejectedValueOnce(abortError);
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.scrape('https://example.com');
-      expect(result).toBeNull();
+      await expect(service.scrape('https://example.com')).rejects.toThrow(
+        'The operation was aborted',
+      );
     });
 
-    it('should return null on network error', async () => {
+    it('should throw on network error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('fetch failed'));
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.scrape('https://example.com');
-      expect(result).toBeNull();
+      await expect(service.scrape('https://example.com')).rejects.toThrow(
+        'fetch failed',
+      );
     });
 
     it('should return null when not configured', async () => {
@@ -217,7 +220,7 @@ describe('FirecrawlService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null on failure', async () => {
+    it('should throw on failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -225,12 +228,9 @@ describe('FirecrawlService', () => {
       });
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.scrapeJson(
-        'https://example.com',
-        schema,
-        'Extract data',
-      );
-      expect(result).toBeNull();
+      await expect(
+        service.scrapeJson('https://example.com', schema, 'Extract data'),
+      ).rejects.toThrow('Firecrawl /scrape failed: 500 Internal Server Error');
     });
 
     it('should return null when not configured', async () => {
@@ -287,7 +287,7 @@ describe('FirecrawlService', () => {
       expect(body.limit).toBe(50);
     });
 
-    it('should return [] on failure', async () => {
+    it('should throw on failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -295,16 +295,18 @@ describe('FirecrawlService', () => {
       });
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.map('https://example.com');
-      expect(result).toEqual([]);
+      await expect(service.map('https://example.com')).rejects.toThrow(
+        'Firecrawl /map failed: 500 Internal Server Error',
+      );
     });
 
-    it('should return [] on network error', async () => {
+    it('should throw on network error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('fetch failed'));
 
       const service = new FirecrawlService(makeConfig('fc-key'));
-      const result = await service.map('https://example.com');
-      expect(result).toEqual([]);
+      await expect(service.map('https://example.com')).rejects.toThrow(
+        'fetch failed',
+      );
     });
 
     it('should return [] when not configured', async () => {

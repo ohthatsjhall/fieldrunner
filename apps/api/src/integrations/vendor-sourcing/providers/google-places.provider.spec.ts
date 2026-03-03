@@ -113,22 +113,24 @@ describe('GooglePlacesProvider', () => {
       expect(body.locationBias.circle.radius).toBe(40000);
     });
 
-    it('should return empty array on API failure', async () => {
+    it('should throw on API failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 403,
         statusText: 'Forbidden',
       });
 
-      const results = await provider.search(defaultParams);
-      expect(results).toEqual([]);
+      await expect(provider.search(defaultParams)).rejects.toThrow(
+        'Google Places search failed: 403 Forbidden',
+      );
     });
 
-    it('should return empty array on network error', async () => {
+    it('should throw on network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      const results = await provider.search(defaultParams);
-      expect(results).toEqual([]);
+      await expect(provider.search(defaultParams)).rejects.toThrow(
+        'Network error',
+      );
     });
 
     it('should handle empty places array in response', async () => {
