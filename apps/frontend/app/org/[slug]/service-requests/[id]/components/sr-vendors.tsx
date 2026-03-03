@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -310,14 +310,14 @@ export function SrVendors({
   reSearchError: string | null;
 }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const prevSessionId = useRef(results?.sessionId);
+  if (results?.sessionId !== prevSessionId.current) {
+    prevSessionId.current = results?.sessionId;
+    setVisibleCount(PAGE_SIZE);
+  }
   const candidates = results?.candidates ?? [];
   const visible = candidates.slice(0, visibleCount);
   const hasMoreToShow = visibleCount < candidates.length;
-
-  // Reset visible count when results change
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [results?.sessionId]);
 
   // Loading skeleton while initial fetch is in progress
   if (resultsLoading && !results) {
