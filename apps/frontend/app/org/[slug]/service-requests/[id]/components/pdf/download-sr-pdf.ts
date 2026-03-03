@@ -46,7 +46,7 @@ export async function downloadSrPdf({ sr, orgName, orgImageUrl }: DownloadSrPdfP
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const customerPart = sr.customerName ? sanitizeFilename(sr.customerName) : 'Report';
-  const filename = `SR-${sr.serviceRequestId}-${customerPart}-${dateStr}.pdf`;
+  const filename = `WO-${sr.serviceRequestId}-${customerPart}-${dateStr}.pdf`;
 
   const a = document.createElement('a');
   a.href = url;
