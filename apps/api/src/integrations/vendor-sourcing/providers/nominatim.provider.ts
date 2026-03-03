@@ -27,33 +27,27 @@ export class NominatimProvider {
 
     const url = `${NOMINATIM_BASE_URL}/search?${params.toString()}`;
 
-    try {
-      const response = await fetch(url, {
-        headers: { 'User-Agent': this.userAgent },
-      });
+    const response = await fetch(url, {
+      headers: { 'User-Agent': this.userAgent },
+    });
 
-      if (!response.ok) {
-        this.logger.warn(
-          `Nominatim geocode failed: ${response.status} ${response.statusText}`,
-        );
-        return null;
-      }
+    if (!response.ok) {
+      throw new Error(
+        `Nominatim geocode failed: ${response.status} ${response.statusText}`,
+      );
+    }
 
-      const results: NominatimSearchResult[] = await response.json();
+    const results: NominatimSearchResult[] = await response.json();
 
-      if (!results.length) {
-        return null;
-      }
-
-      const first = results[0];
-      return {
-        latitude: parseFloat(first.lat),
-        longitude: parseFloat(first.lon),
-        displayName: first.display_name,
-      };
-    } catch (error) {
-      this.logger.error('Nominatim geocode error', error);
+    if (!results.length) {
       return null;
     }
+
+    const first = results[0];
+    return {
+      latitude: parseFloat(first.lat),
+      longitude: parseFloat(first.lon),
+      displayName: first.display_name,
+    };
   }
 }

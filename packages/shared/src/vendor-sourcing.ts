@@ -36,6 +36,7 @@ export type VendorSearchResponse = {
   resultCount: number;
   durationMs: number | null;
   candidates: VendorCandidate[];
+  hasMore: boolean;
 };
 
 export type VendorSearchRequest = {

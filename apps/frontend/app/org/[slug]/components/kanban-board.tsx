@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Building2 } from 'lucide-react';
 import type { ServiceRequest, ServiceRequestStatus } from '@fieldrunner/shared';
-import { StatusBadge, PriorityBadge } from './columns';
+import { StatusBadge, PriorityBadge, getStatusBorderColor } from './columns';
 
 const STATUS_ORDER: ServiceRequestStatus[] = [
   'New',
@@ -40,19 +40,6 @@ function groupByStatus(requests: ServiceRequest[]): Map<string, ServiceRequest[]
   return groups;
 }
 
-const PRIORITY_BORDER_COLORS: Record<string, string> = {
-  high: 'border-l-red-500',
-  urgent: 'border-l-red-500',
-  normal: 'border-l-amber-400',
-};
-
-const DEFAULT_PRIORITY_BORDER = 'border-l-zinc-300 dark:border-l-zinc-600';
-
-function getPriorityBorderColor(priority: string): string {
-  const lower = String(priority ?? '').toLowerCase();
-  return PRIORITY_BORDER_COLORS[lower] ?? DEFAULT_PRIORITY_BORDER;
-}
-
 function KanbanCard({ sr }: { sr: ServiceRequest }) {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
@@ -61,7 +48,7 @@ function KanbanCard({ sr }: { sr: ServiceRequest }) {
   return (
     <div
       onClick={() => router.push(detailUrl)}
-      className={`group cursor-pointer rounded-md border border-l-[3px] bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${getPriorityBorderColor(sr.priority)}`}
+      className={`group cursor-pointer rounded-md border border-l-[3px] bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${getStatusBorderColor(sr.status)}`}
     >
       <div className="mb-1.5 flex items-center justify-between">
         <Link

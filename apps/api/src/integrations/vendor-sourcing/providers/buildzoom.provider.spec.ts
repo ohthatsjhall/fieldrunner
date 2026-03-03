@@ -191,7 +191,7 @@ describe('BuildZoomProvider', () => {
     expect(result[0].name).toBe('Acme Plumbing');
   });
 
-  it('should limit profile scraping to MAX_PROFILES', async () => {
+  it('should limit discovered URLs to MAX_DISCOVERED_URLS', async () => {
     const firecrawl = makeFirecrawl();
     const manyLinks = Array.from(
       { length: 15 },
@@ -206,6 +206,7 @@ describe('BuildZoomProvider', () => {
     const provider = new BuildZoomProvider(firecrawl);
     await provider.search(makeParams());
 
+    // Only 10 URLs should be discovered and scraped
     expect(firecrawl.scrapeJson).toHaveBeenCalledTimes(10);
   });
 
@@ -256,6 +257,105 @@ describe('BuildZoomProvider', () => {
   });
 });
 
+// ── discoverProfileUrls ─────────────────────────────────────────────
+
+describe('discoverProfileUrls', () => {
+  it('should return profile URLs without scraping any profiles', async () => {
+    const firecrawl = makeFirecrawl();
+    firecrawl.scrape.mockResolvedValueOnce({ links: sampleLinks });
+
+    const provider = new BuildZoomProvider(firecrawl);
+    const urls = await provider.discoverProfileUrls(makeParams());
+
+    expect(urls).toEqual([
+      'https://www.buildzoom.com/contractor/acme-plumbing',
+      'https://www.buildzoom.com/contractor/best-pipes',
+    ]);
+    // Should NOT call scrapeJson
+    expect(firecrawl.scrapeJson).not.toHaveBeenCalled();
+  });
+
+  it('should return [] when disabled', async () => {
+    const firecrawl = makeFirecrawl(false);
+    const provider = new BuildZoomProvider(firecrawl);
+    const urls = await provider.discoverProfileUrls(makeParams());
+    expect(urls).toEqual([]);
+  });
+
+  it('should return [] when no locationName', async () => {
+    const firecrawl = makeFirecrawl();
+    const provider = new BuildZoomProvider(firecrawl);
+    const urls = await provider.discoverProfileUrls(
+      makeParams({ locationName: undefined }),
+    );
+    expect(urls).toEqual([]);
+  });
+
+  it('should cap at MAX_DISCOVERED_URLS (10)', async () => {
+    const firecrawl = makeFirecrawl();
+    const manyLinks = Array.from(
+      { length: 15 },
+      (_, i) => `https://www.buildzoom.com/contractor/contractor-${i}`,
+    );
+    firecrawl.scrape.mockResolvedValueOnce({ links: manyLinks });
+
+    const provider = new BuildZoomProvider(firecrawl);
+    const urls = await provider.discoverProfileUrls(makeParams());
+    expect(urls).toHaveLength(10);
+  });
+});
+
+// ── scrapeProfiles ──────────────────────────────────────────────────
+
+describe('scrapeProfiles', () => {
+  it('should scrape a given batch of URLs and return NormalizedPlaces', async () => {
+    const firecrawl = makeFirecrawl();
+    firecrawl.scrapeJson.mockResolvedValue({
+      data: { ...sampleContractorJson },
+      metadata: { description: '' },
+    });
+
+    const provider = new BuildZoomProvider(firecrawl);
+    const urls = [
+      'https://www.buildzoom.com/contractor/acme-plumbing',
+      'https://www.buildzoom.com/contractor/best-pipes',
+    ];
+    const results = await provider.scrapeProfiles(urls);
+
+    expect(firecrawl.scrapeJson).toHaveBeenCalledTimes(2);
+    expect(results).toHaveLength(2);
+    expect(results[0].source).toBe('buildzoom');
+  });
+
+  it('should return [] for empty URL array', async () => {
+    const firecrawl = makeFirecrawl();
+    const provider = new BuildZoomProvider(firecrawl);
+    const results = await provider.scrapeProfiles([]);
+
+    expect(results).toEqual([]);
+    expect(firecrawl.scrapeJson).not.toHaveBeenCalled();
+  });
+
+  it('should handle partial failures gracefully', async () => {
+    const firecrawl = makeFirecrawl();
+    firecrawl.scrapeJson
+      .mockResolvedValueOnce({
+        data: { ...sampleContractorJson },
+        metadata: { description: '' },
+      })
+      .mockResolvedValueOnce(null);
+
+    const provider = new BuildZoomProvider(firecrawl);
+    const results = await provider.scrapeProfiles([
+      'https://www.buildzoom.com/contractor/acme-plumbing',
+      'https://www.buildzoom.com/contractor/fail',
+    ]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('Acme Plumbing');
+  });
+});
+
 // ── buildSearchUrl ──────────────────────────────────────────────────
 
 describe('buildSearchUrl', () => {
@@ -286,6 +386,23 @@ describe('buildSearchUrl', () => {
   it('should not pluralize trade names ending in -ing', () => {
     const url = buildSearchUrl('Pittsburgh, PA', 'plumbing');
     expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/plumbing');
+  });
+
+  it('should map "Electrical" to "electricians" via known slug', () => {
+    const url = buildSearchUrl('Fremont, OH', 'Electrical');
+    expect(url).toBe('https://www.buildzoom.com/fremont-oh/electricians');
+  });
+
+  it('should map "HVAC" to "hvac-contractors" via known slug', () => {
+    const url = buildSearchUrl('Pittsburgh, PA', 'HVAC');
+    expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/hvac-contractors');
+  });
+
+  it('should map "General Maintenance" to "general-contractors" via known slug', () => {
+    const url = buildSearchUrl('Pittsburgh, PA', 'General Maintenance');
+    expect(url).toBe(
+      'https://www.buildzoom.com/pittsburgh-pa/general-contractors',
+    );
   });
 });
 

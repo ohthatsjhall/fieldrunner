@@ -46,6 +46,7 @@ export class BlueFolderController {
   }
 
   @Get('service-requests/:id')
+  @Header('Cache-Control', 'private, max-age=120')
   @ApiOperation({ summary: 'Get a service request by BlueFolder ID' })
   @ApiResponse({ status: 200, description: 'Service request detail' })
   getServiceRequest(
@@ -56,6 +57,7 @@ export class BlueFolderController {
   }
 
   @Get('service-requests/:id/files')
+  @Header('Cache-Control', 'private, max-age=300')
   @ApiOperation({ summary: 'Get files attached to a service request' })
   @ApiResponse({ status: 200, description: 'List of attached files' })
   getServiceRequestFiles(
@@ -74,6 +76,7 @@ export class BlueFolderController {
   }
 
   @Get('sync-status')
+  @Header('Cache-Control', 'private, max-age=60')
   @ApiOperation({ summary: 'Get the last sync timestamp' })
   @ApiResponse({ status: 200, description: 'Last synced timestamp' })
   async getSyncStatus(@CurrentOrg() org: AuthOrganization) {

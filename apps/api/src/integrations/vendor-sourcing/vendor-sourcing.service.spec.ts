@@ -202,6 +202,15 @@ describe('VendorSourcingService', () => {
       name: 'buildzoom',
       isEnabled: true,
       search: jest.fn().mockResolvedValue([makeBzPlace()]),
+      discoverProfileUrls: jest.fn().mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-plumbing',
+        'https://www.buildzoom.com/contractor/bz-plumbing-2',
+        'https://www.buildzoom.com/contractor/bz-plumbing-3',
+        'https://www.buildzoom.com/contractor/bz-plumbing-4',
+        'https://www.buildzoom.com/contractor/bz-plumbing-5',
+        'https://www.buildzoom.com/contractor/bz-plumbing-6',
+      ]),
+      scrapeProfiles: jest.fn().mockResolvedValue([makeBzPlace()]),
     } as unknown as jest.Mocked<BuildZoomProvider>;
 
     mockQueryGenerator = {
@@ -277,6 +286,7 @@ describe('VendorSourcingService', () => {
       expect(result.candidates.length).toBeGreaterThan(0);
       expect(result.candidates[0].rank).toBe(1);
       expect(result.candidates[0].score).toBeGreaterThan(0);
+      expect(result.hasMore).toBe(false);
       expect(mockEmailEnrichment.enrichPlaces).toHaveBeenCalledTimes(1);
     });
 
@@ -357,7 +367,8 @@ describe('VendorSourcingService', () => {
       });
 
       expect(mockGooglePlaces.search).toHaveBeenCalled();
-      expect(mockBuildZoom.search).toHaveBeenCalled();
+      expect(mockBuildZoom.discoverProfileUrls).toHaveBeenCalled();
+      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalled();
     });
 
     it('should geocode BuildZoom results lacking coordinates', async () => {
@@ -375,7 +386,7 @@ describe('VendorSourcingService', () => {
 
     it('should deduplicate across sources by phone', async () => {
       // BZ returns same phone as Google result — should be skipped
-      mockBuildZoom.search.mockResolvedValue([
+      mockBuildZoom.scrapeProfiles.mockResolvedValue([
         makeBzPlace({ phone: '+1 512-555-0001' }), // same as Google's Best Plumber
       ]);
 
@@ -391,7 +402,7 @@ describe('VendorSourcingService', () => {
     });
 
     it('should continue with Google-only when BuildZoom fails', async () => {
-      mockBuildZoom.search.mockRejectedValue(new Error('BZ timeout'));
+      mockBuildZoom.discoverProfileUrls.mockRejectedValue(new Error('BZ timeout'));
 
       const result = await service.search(clerkOrgId, {
         serviceRequestBluefolderId: 2270,
@@ -422,5 +433,258 @@ describe('VendorSourcingService', () => {
         expect(typeof c.scores.credential).toBe('number');
       }
     });
+
+    it('should scrape all BuildZoom URLs upfront and return hasMore: false', async () => {
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-1',
+        'https://www.buildzoom.com/contractor/bz-2',
+        'https://www.buildzoom.com/contractor/bz-3',
+        'https://www.buildzoom.com/contractor/bz-4',
+        'https://www.buildzoom.com/contractor/bz-5',
+        'https://www.buildzoom.com/contractor/bz-6',
+        'https://www.buildzoom.com/contractor/bz-7',
+      ]);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(false);
+      // All 7 URLs should be passed to scrapeProfiles
+      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'https://www.buildzoom.com/contractor/bz-6',
+          'https://www.buildzoom.com/contractor/bz-7',
+        ]),
+      );
+    });
+
+    it('should return hasMore: false when no pending URLs', async () => {
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([
+        'https://www.buildzoom.com/contractor/bz-1',
+        'https://www.buildzoom.com/contractor/bz-2',
+      ]);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should return hasMore: false on failed search', async () => {
+      mockNominatim.geocode.mockResolvedValue(null);
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should deduplicate vendors with the same phone across providers', async () => {
+      // Google returns two places from different queries with the same phone
+      const place1 = makeGooglePlace({
+        sourceId: 'ChIJ_dup1',
+        name: 'Plumber A (listing 1)',
+        phone: '+1 512-555-7777',
+      });
+      const place2 = makeGooglePlace({
+        sourceId: 'ChIJ_dup2',
+        name: 'Plumber A (listing 2)',
+        phone: '+1 512-555-7777', // same phone
+      });
+
+      mockGooglePlaces.search.mockResolvedValue([place1, place2]);
+      mockBuildZoom.discoverProfileUrls.mockResolvedValue([]);
+      mockBuildZoom.scrapeProfiles.mockResolvedValue([]);
+
+      // Mock chain: SR lookup → phone match (place1) → vendor update (place1)
+      //   → phone match (place2) → vendor update (place2) → session update
+      mockDb.where
+        .mockResolvedValueOnce([{ id: 'sr-uuid' }]) // SR lookup
+        .mockResolvedValueOnce([{ id: 'same-vendor-id' }]) // phone match for place1
+        .mockResolvedValueOnce(undefined) // vendor update for place1
+        .mockResolvedValueOnce([{ id: 'same-vendor-id' }]) // phone match for place2
+        .mockResolvedValueOnce(undefined) // vendor update for place2
+        .mockResolvedValueOnce(undefined); // session update
+
+      const result = await service.search(clerkOrgId, {
+        serviceRequestBluefolderId: 2270,
+      });
+
+      // Should NOT crash with a unique constraint violation.
+      // Only 1 candidate should be returned (deduped by vendorId).
+      expect(result.status).toBe('completed');
+      expect(result.candidates.length).toBe(1);
+    });
   });
+
+  describe('getResultsByServiceRequest', () => {
+    it('should return null when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 9999);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when SR exists but has no session', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup: where → orderBy → limit chain
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return in_progress status when session is still running', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'in_progress',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 0,
+              durationMs: null,
+            },
+          ]),
+        }),
+      });
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('in_progress');
+      expect(result!.candidates).toEqual([]);
+    });
+
+    it('should return completed results with candidates sorted by rank', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'completed',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 2,
+              durationMs: 5000,
+            },
+          ]),
+        }),
+      });
+      // Results lookup
+      mockDb.where.mockResolvedValueOnce([
+        {
+          vendorId: 'v-1',
+          rank: 2,
+          score: '75.5',
+          distanceMeters: '1500',
+          distanceScore: '80',
+          ratingScore: '70',
+          reviewCountScore: '60',
+          categoryMatchScore: '90',
+          businessHoursScore: '50',
+          credentialScore: '40',
+        },
+        {
+          vendorId: 'v-2',
+          rank: 1,
+          score: '85.0',
+          distanceMeters: '500',
+          distanceScore: '95',
+          ratingScore: '80',
+          reviewCountScore: '70',
+          categoryMatchScore: '90',
+          businessHoursScore: '60',
+          credentialScore: '50',
+        },
+      ]);
+      // Vendor lookup by inArray
+      mockDb.where.mockResolvedValueOnce([
+        {
+          id: 'v-1',
+          name: 'Vendor One',
+          phone: '5125550001',
+          phoneRaw: '(512) 555-0001',
+          address: '100 Test St',
+          website: 'https://one.com',
+          email: null,
+          rating: '4.5',
+          reviewCount: 100,
+          categories: ['plumber'],
+          googlePlaceId: 'ChIJ_1',
+        },
+        {
+          id: 'v-2',
+          name: 'Vendor Two',
+          phone: '5125550002',
+          phoneRaw: '(512) 555-0002',
+          address: '200 Test St',
+          website: null,
+          email: null,
+          rating: null,
+          reviewCount: null,
+          categories: null,
+          googlePlaceId: null,
+        },
+      ]);
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('completed');
+      expect(result!.candidates).toHaveLength(2);
+      // Should be sorted by rank (1 before 2)
+      expect(result!.candidates[0].rank).toBe(1);
+      expect(result!.candidates[1].rank).toBe(2);
+      // Scores should be numbers, not strings
+      expect(typeof result!.candidates[0].score).toBe('number');
+      expect(result!.candidates[0].score).toBe(85.0);
+    });
+
+    it('should handle session with zero results gracefully', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'completed',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 0,
+              durationMs: 2000,
+            },
+          ]),
+        }),
+      });
+      // Results lookup (empty)
+      mockDb.where.mockResolvedValueOnce([]);
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('completed');
+      expect(result!.candidates).toEqual([]);
+    });
+  });
+
 });

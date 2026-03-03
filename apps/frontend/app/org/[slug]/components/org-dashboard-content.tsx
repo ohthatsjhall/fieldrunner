@@ -1,12 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TableProperties, Columns3 } from 'lucide-react';
-import { useApiClient } from '@/lib/api-client-browser';
-import type { ServiceRequest, ServiceRequestStats } from '@fieldrunner/shared';
+import type { ServiceRequestStats } from '@fieldrunner/shared';
 import { cn } from '@/lib/utils';
+import {
+  useStats,
+  useServiceRequests,
+  useSyncStatus,
+  useSyncBlueFolder,
+} from '@/hooks/queries';
 import { DataTable } from './data-table';
 import { useServiceRequestColumns } from './columns';
 import { KanbanBoard } from './kanban-board';
@@ -49,17 +53,17 @@ function formatTimeAgo(dateString: string): string {
 }
 
 export function OrgDashboardContent({ slug }: { slug: string }) {
-  const { orgId } = useAuth();
-  const orgReady = !!orgId;
   const router = useRouter();
-  const { apiFetch } = useApiClient();
 
-  const [stats, setStats] = useState<ServiceRequestStats | null>(null);
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: stats, isLoading: statsLoading, error: statsError } = useStats();
+  const { data: serviceRequests = [], isLoading: srLoading } = useServiceRequests();
+  const { data: syncData } = useSyncStatus();
+  const sync = useSyncBlueFolder();
+
+  const loading = statsLoading || srLoading;
+  const error = statsError?.message ?? sync.error?.message ?? null;
+  const lastSyncedAt = syncData?.lastSyncedAt ?? null;
+
   const [hideClosed, setHideClosed] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>(() => {
     if (typeof window === 'undefined') return 'table';
@@ -75,8 +79,8 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
     setViewMode(mode);
     try {
       localStorage.setItem('sr-view-mode', mode);
-    } catch (err) {
-      console.warn('[OrgDashboardContent] Failed to persist view mode:', err);
+    } catch {
+      // localStorage unavailable — ignore
     }
   }, []);
 
@@ -90,52 +94,6 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
 
   const columns = useServiceRequestColumns(visibleRequests);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [statsData, srData] = await Promise.all([
-        apiFetch<ServiceRequestStats>('/bluefolder/stats'),
-        apiFetch<ServiceRequest[]>('/bluefolder/service-requests'),
-      ]);
-
-      setStats(statsData);
-      setServiceRequests(srData);
-
-      // Sync status is non-critical — don't fail the whole load if it errors
-      try {
-        const syncData = await apiFetch<{ lastSyncedAt: string | null }>('/bluefolder/sync-status');
-        setLastSyncedAt(syncData.lastSyncedAt ?? null);
-      } catch (err) {
-        console.warn('[OrgDashboardContent] Failed to fetch sync status:', err);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load data';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch]);
-
-  const handleSync = useCallback(async () => {
-    setSyncing(true);
-    setError(null);
-    try {
-      await apiFetch<void>('/bluefolder/sync', { method: 'POST' });
-      await fetchData();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed';
-      setError(message);
-    } finally {
-      setSyncing(false);
-    }
-  }, [apiFetch, fetchData]);
-
-  useEffect(() => {
-    if (!orgReady) return;
-    fetchData();
-  }, [orgReady, fetchData]);
-
   const hasData = serviceRequests.length > 0;
 
   return (
@@ -145,11 +103,11 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
         <h1 className="font-title text-2xl font-bold">Service Requests</h1>
         <div className="flex flex-col items-end gap-1">
           <button
-            onClick={handleSync}
-            disabled={syncing}
+            onClick={() => sync.mutate()}
+            disabled={sync.isPending}
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            {syncing ? (
+            {sync.isPending ? (
               <>
                 <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

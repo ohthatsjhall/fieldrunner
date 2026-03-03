@@ -1,4 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { eq, desc, sql, isNotNull, and, isNull } from 'drizzle-orm';
 import type { ServiceRequestStats } from '@fieldrunner/shared';
@@ -12,6 +13,7 @@ import {
 import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
+import { SYNC_COMPLETED } from '../../common/events/sync.events';
 
 export interface SyncResult {
   total: number;
@@ -37,6 +39,7 @@ export class ServiceRequestsService {
     private readonly blueFolderService: BlueFolderService,
     private readonly usersService: BlueFolderUsersService,
     private readonly settingsService: OrganizationSettingsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async sync(clerkOrgId: string): Promise<SyncResult> {
@@ -115,6 +118,9 @@ export class ServiceRequestsService {
       clerkOrgId,
       total: items.length,
     });
+
+    // Fire-and-forget: auto vendor search runs in VendorAutoSearchListener (errors logged there, not propagated)
+    this.eventEmitter.emit(SYNC_COMPLETED, { clerkOrgId, organizationId });
 
     return { total: items.length, syncedAt };
   }

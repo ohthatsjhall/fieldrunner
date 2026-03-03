@@ -11,6 +11,7 @@ import { OrganizationSettingsModule } from '../../org/settings/settings.module';
 import { BlueFolderModule } from '../bluefolder/bluefolder.module';
 import { FirecrawlModule } from '../firecrawl/firecrawl.module';
 import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
+import { VendorAutoSearchListener } from './vendor-auto-search.listener';
 
 @Module({
   imports: [OrganizationSettingsModule, BlueFolderModule, FirecrawlModule],
@@ -24,6 +25,7 @@ import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
     VendorScoringService,
     TradeCategoriesService,
     EmailEnrichmentService,
+    VendorAutoSearchListener,
   ],
 })
 export class VendorSourcingModule {}

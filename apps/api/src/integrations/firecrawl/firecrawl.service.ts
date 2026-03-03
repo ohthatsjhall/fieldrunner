@@ -35,26 +35,20 @@ export class FirecrawlService {
     const body: Record<string, unknown> = { url, ...options };
     const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
 
-    try {
-      const response = await this.post('/scrape', body, timeoutMs);
-      if (!response) return null;
+    const response = await this.post('/scrape', body, timeoutMs);
 
-      const json = await response.json();
-      const data = (json as Record<string, unknown>).data as
-        | Record<string, unknown>
-        | undefined;
-      if (!data) return null;
+    const json = await response.json();
+    const data = (json as Record<string, unknown>).data as
+      | Record<string, unknown>
+      | undefined;
+    if (!data) return null;
 
-      return {
-        markdown: data.markdown as string | undefined,
-        links: data.links as string[] | undefined,
-        json: data.json as Record<string, unknown> | undefined,
-        metadata: data.metadata as Record<string, unknown> | undefined,
-      };
-    } catch (error) {
-      this.logError('scrape', url, error);
-      return null;
-    }
+    return {
+      markdown: data.markdown as string | undefined,
+      links: data.links as string[] | undefined,
+      json: data.json as Record<string, unknown> | undefined,
+      metadata: data.metadata as Record<string, unknown> | undefined,
+    };
   }
 
   async scrapeJson<T>(
@@ -72,27 +66,21 @@ export class FirecrawlService {
     };
     const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
 
-    try {
-      const response = await this.post('/scrape', body, timeoutMs);
-      if (!response) return null;
+    const response = await this.post('/scrape', body, timeoutMs);
 
-      const json = await response.json();
-      const data = (json as Record<string, unknown>).data as
-        | Record<string, unknown>
-        | undefined;
-      if (!data) return null;
+    const json = await response.json();
+    const data = (json as Record<string, unknown>).data as
+      | Record<string, unknown>
+      | undefined;
+    if (!data) return null;
 
-      const extracted = data.json as T | undefined;
-      if (extracted === undefined || extracted === null) return null;
+    const extracted = data.json as T | undefined;
+    if (extracted === undefined || extracted === null) return null;
 
-      return {
-        data: extracted,
-        metadata: (data.metadata as Record<string, unknown>) ?? {},
-      };
-    } catch (error) {
-      this.logError('scrapeJson', url, error);
-      return null;
-    }
+    return {
+      data: extracted,
+      metadata: (data.metadata as Record<string, unknown>) ?? {},
+    };
   }
 
   async map(url: string, options?: MapOptions): Promise<string[]> {
@@ -100,26 +88,20 @@ export class FirecrawlService {
 
     const body: Record<string, unknown> = { url, ...options };
 
-    try {
-      const response = await this.post('/map', body, DEFAULT_TIMEOUT_MS);
-      if (!response) return [];
+    const response = await this.post('/map', body, DEFAULT_TIMEOUT_MS);
 
-      const json = await response.json();
-      const links = (json as Record<string, unknown>).links;
-      if (!Array.isArray(links)) return [];
+    const json = await response.json();
+    const links = (json as Record<string, unknown>).links;
+    if (!Array.isArray(links)) return [];
 
-      return links as string[];
-    } catch (error) {
-      this.logError('map', url, error);
-      return [];
-    }
+    return links as string[];
   }
 
   private async post(
     path: string,
     body: Record<string, unknown>,
     timeoutMs: number,
-  ): Promise<Response | null> {
+  ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -137,23 +119,14 @@ export class FirecrawlService {
       });
 
       if (!response.ok) {
-        this.logger.warn(
+        throw new Error(
           `Firecrawl ${path} failed: ${response.status} ${response.statusText}`,
         );
-        return null;
       }
 
       return response;
     } finally {
       clearTimeout(timeout);
-    }
-  }
-
-  private logError(method: string, url: string, error: unknown): void {
-    if (error instanceof Error && error.name === 'AbortError') {
-      this.logger.warn(`Firecrawl ${method} timed out for ${url}`);
-    } else {
-      this.logger.error(`Firecrawl ${method} error for ${url}`, error);
     }
   }
 }

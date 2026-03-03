@@ -6,14 +6,12 @@ import type { ServiceRequestDetail } from '@fieldrunner/shared';
 // Shared mock for the create method
 const mockCreate = jest.fn();
 
-jest.mock('@anthropic-ai/sdk', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      messages: { create: mockCreate },
-    })),
-  };
-});
+jest.mock('@anthropic-ai/sdk', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    messages: { create: mockCreate },
+  })),
+}));
 
 function makeSrDetail(
   overrides: Partial<ServiceRequestDetail> = {},

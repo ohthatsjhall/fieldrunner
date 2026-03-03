@@ -184,11 +184,38 @@ export function useServiceRequestColumns(data: ServiceRequest[]) {
 
 const STATUS_COLORS: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  proposed: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  assigned: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
   'in progress': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  'job costing': 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'work complete': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'waiting on invoice': 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  'wo needs fix': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   closed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
 };
 
 const DEFAULT_STATUS_COLOR = 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+
+const STATUS_BORDER_COLORS: Record<string, string> = {
+  new: 'border-l-blue-500/25',
+  proposed: 'border-l-violet-500/25',
+  assigned: 'border-l-indigo-500/25',
+  'in progress': 'border-l-yellow-500/25',
+  'job costing': 'border-l-zinc-400/25',
+  'work complete': 'border-l-emerald-500/25',
+  'waiting on invoice': 'border-l-sky-500/25',
+  'wo needs fix': 'border-l-rose-500/25',
+  cancelled: 'border-l-red-500/25',
+  closed: 'border-l-green-500/25',
+};
+
+const DEFAULT_STATUS_BORDER = 'border-l-zinc-300/25 dark:border-l-zinc-600/25';
+
+export function getStatusBorderColor(status: string): string {
+  const lower = String(status ?? '').toLowerCase();
+  return STATUS_BORDER_COLORS[lower] ?? DEFAULT_STATUS_BORDER;
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const lower = String(status ?? '').toLowerCase();

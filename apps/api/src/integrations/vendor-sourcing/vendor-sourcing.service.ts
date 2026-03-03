@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
   vendors,
@@ -25,7 +25,11 @@ import type {
   CredentialSignals,
 } from './scoring/scoring.types';
 import { EMPTY_CREDENTIALS } from './scoring/scoring.types';
-import type { VendorSearchResponse, VendorCandidate } from '@fieldrunner/shared';
+import type {
+  VendorSearchResponse,
+  VendorCandidate,
+  ValidEmail,
+} from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../core/database/schema';
 import type { BuildZoomContractor } from './types/buildzoom-api.types';
@@ -37,6 +41,11 @@ type SearchParams = {
   radiusMeters?: number;
   initiatedBy?: string;
 };
+
+/** Convert a nullable string column to a number, or null. */
+function toNumber(value: string | null | undefined): number | null {
+  return value != null ? Number(value) : null;
+}
 
 @Injectable()
 export class VendorSourcingService {
@@ -134,6 +143,7 @@ export class VendorSourcingService {
         resultCount: 0,
         durationMs: Date.now() - startTime,
         candidates: [],
+        hasMore: false,
       };
     }
 
@@ -169,8 +179,12 @@ export class VendorSourcingService {
       // Collect Google results
       const allPlaces: NormalizedPlace[] = [];
       const seenPhones = new Set<string>();
+      let googleCount = 0;
+      let bzRawCount = 0;
+      let bzDedupedCount = 0;
 
       if (googleResult.status === 'fulfilled') {
+        googleCount = googleResult.value.length;
         for (const p of googleResult.value) {
           allPlaces.push(p);
           const norm = normalizePhone(p.phone);
@@ -181,87 +195,53 @@ export class VendorSourcingService {
       }
 
       // Collect BuildZoom results (dedup by phone, geocode missing coords)
-      if (buildZoomResult.status === 'fulfilled' && buildZoomResult.value.length > 0) {
+      if (buildZoomResult.status === 'fulfilled') {
         const bzPlaces = buildZoomResult.value;
-        sourceCounts['buildzoom'] = bzPlaces.length;
+        bzRawCount = bzPlaces.length;
 
-        for (const p of bzPlaces) {
-          const norm = normalizePhone(p.phone);
-          if (norm && seenPhones.has(norm)) {
-            this.logger.log(`Cross-source dedup: ${p.name} (phone ${norm})`);
-            continue;
-          }
-
-          // Geocode BuildZoom results (they lack lat/lon)
-          if (p.latitude === null && p.longitude === null && p.address) {
-            const geo = await this.nominatim.geocode(p.address);
-            if (geo) {
-              p.latitude = geo.latitude;
-              p.longitude = geo.longitude;
-            }
-          }
-
-          allPlaces.push(p);
-          if (norm) seenPhones.add(norm);
+        if (bzPlaces.length > 0) {
+          sourceCounts['buildzoom'] = bzPlaces.length;
+          const dedupedBz = this.deduplicateByPhone(bzPlaces, seenPhones);
+          bzDedupedCount = dedupedBz.length;
+          await this.geocodeMissingCoordinates(dedupedBz);
+          allPlaces.push(...dedupedBz);
         }
-      } else if (buildZoomResult.status === 'rejected') {
+      } else {
         this.logger.warn('BuildZoom search failed', buildZoomResult.reason);
       }
 
       // 5. Enrich emails from vendor websites (best-effort)
+      const emailsBefore = allPlaces.filter((p) => p.email !== null).length;
       await this.emailEnrichment.enrichPlaces(allPlaces);
+      const emailsAfter = allPlaces.filter((p) => p.email !== null).length;
+      const emailsFound = emailsAfter - emailsBefore;
 
       // 6. Deduplicate and upsert vendors
       const vendorIds = await this.upsertVendors(organizationId, allPlaces);
 
-      // 7. Score and rank
-      const scoringInputs = allPlaces.map((p, i) => ({
-        id: vendorIds[i],
-        input: this.buildScoringInput(
-          p,
-          geocoded!.latitude,
-          geocoded!.longitude,
-        ),
-      }));
+      // 7. Score and rank (dedup by vendorId — multiple places can resolve to
+      //    the same vendor when they share a phone number)
+      const scoringInputs = this.buildDedupedScoringInputs(
+        vendorIds,
+        allPlaces,
+        geocoded!.latitude,
+        geocoded!.longitude,
+      );
 
       const ranked = this.scoring.scoreAndRank(
         scoringInputs,
         radiusMeters,
-        undefined,
-        10,
       );
 
       // 8. Insert search results
       if (ranked.length > 0) {
-        await this.db.insert(vendorSearchResults).values(
-          ranked.map((r) => {
-            const placeIdx = vendorIds.indexOf(r.id);
-            const p = placeIdx >= 0 ? allPlaces[placeIdx] : null;
-            const distMeters =
-              p?.latitude != null && p?.longitude != null
-                ? this.haversine(
-                    geocoded!.latitude,
-                    geocoded!.longitude,
-                    p.latitude,
-                    p.longitude,
-                  )
-                : null;
-
-            return {
-              searchSessionId: session.id,
-              vendorId: r.id,
-              rank: r.rank,
-              score: String(r.scored.totalScore),
-              distanceScore: String(r.scored.distanceScore),
-              ratingScore: String(r.scored.ratingScore),
-              reviewCountScore: String(r.scored.reviewCountScore),
-              categoryMatchScore: String(r.scored.categoryMatchScore),
-              businessHoursScore: String(r.scored.businessHoursScore),
-              credentialScore: String(r.scored.credentialScore),
-              distanceMeters:
-                distMeters !== null ? String(distMeters.toFixed(2)) : null,
-            };
-          }),
+        await this.insertSearchResults(
+          session.id,
+          ranked,
+          vendorIds,
+          allPlaces,
+          geocoded!.latitude,
+          geocoded!.longitude,
         );
       }
 
@@ -277,6 +257,40 @@ export class VendorSourcingService {
           completedAt: new Date(),
         })
         .where(eq(vendorSearchSessions.id, session.id));
+
+      // Detailed search summary
+      const emailVendors = allPlaces
+        .filter((p) => p.email !== null)
+        .map((p) => `${p.name} <${p.email}>`);
+
+      this.logger.log([
+        `\n========== VENDOR SEARCH COMPLETE ==========`,
+        `Session:     ${session.id}`,
+        `Query:       ${searchQueries.join(' | ')}`,
+        `Address:     ${address}`,
+        `Duration:    ${(durationMs / 1000).toFixed(1)}s`,
+        ``,
+        `--- Sources ---`,
+        `Google Places: ${googleCount} vendor(s)`,
+        `BuildZoom:     ${bzRawCount} scraped → ${bzDedupedCount} after phone dedup`,
+        `Combined:      ${allPlaces.length} unique vendor(s)`,
+        ``,
+        `--- Email Enrichment ---`,
+        `Attempted:   ${allPlaces.filter((p) => p.email === null && p.website !== null).length + emailsFound} vendor(s) with websites`,
+        `Found:       ${emailsFound} new email(s)`,
+        emailVendors.length > 0
+          ? `Emails:      ${emailVendors.join(', ')}`
+          : `Emails:      none`,
+        ``,
+        `--- Scoring ---`,
+        `Ranked:      ${ranked.length} vendor(s)`,
+        `Top 5:       ${ranked.slice(0, 5).map((r) => {
+          const idx = vendorIds.indexOf(r.id);
+          const name = idx >= 0 ? allPlaces[idx]?.name : 'unknown';
+          return `${name} (${r.scored.totalScore.toFixed(1)})`;
+        }).join(', ')}`,
+        `============================================`,
+      ].join('\n'));
 
       // 10. Build response
       const candidates = this.buildCandidates(
@@ -295,6 +309,7 @@ export class VendorSourcingService {
         resultCount: ranked.length,
         durationMs,
         candidates,
+        hasMore: false,
       };
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -310,7 +325,7 @@ export class VendorSourcingService {
         })
         .where(eq(vendorSearchSessions.id, session.id));
 
-      this.logger.error('Vendor search failed', error);
+      this.logger.error(`Vendor search failed: ${errorMessage}`, error instanceof Error ? error.stack : error);
 
       return {
         sessionId: session.id,
@@ -320,6 +335,7 @@ export class VendorSourcingService {
         resultCount: 0,
         durationMs,
         candidates: [],
+        hasMore: false,
       };
     }
   }
@@ -363,14 +379,23 @@ export class VendorSourcingService {
   ): Promise<NormalizedPlace[]> {
     if (!this.buildZoom.isEnabled) return [];
 
-    return this.buildZoom.search({
+    const params = {
       query,
       latitude: geocoded.latitude,
       longitude: geocoded.longitude,
       radiusMeters,
       locationName,
       tradeCategory,
-    });
+    };
+
+    const allUrls = await this.buildZoom.discoverProfileUrls(params);
+    if (allUrls.length === 0) return [];
+
+    this.logger.log(
+      `BuildZoom URLs: ${allUrls.length} discovered, scraping all`,
+    );
+
+    return this.buildZoom.scrapeProfiles(allUrls);
   }
 
   async getSession(organizationId: string, sessionId: string) {
@@ -404,6 +429,112 @@ export class VendorSourcingService {
       session: sessions[0],
       results,
       vendors: vendorRows,
+    };
+  }
+
+  async getResultsByServiceRequest(
+    clerkOrgId: string,
+    bluefolderId: number,
+  ): Promise<VendorSearchResponse | null> {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Find internal SR ID
+    const srRows = await this.db
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(
+        and(
+          eq(serviceRequests.organizationId, organizationId),
+          eq(serviceRequests.bluefolderId, bluefolderId),
+        ),
+      );
+
+    const serviceRequestId = srRows[0]?.id;
+    if (!serviceRequestId) return null;
+
+    // Find latest session for this SR
+    const sessions = await this.db
+      .select()
+      .from(vendorSearchSessions)
+      .where(eq(vendorSearchSessions.serviceRequestId, serviceRequestId))
+      .orderBy(desc(vendorSearchSessions.createdAt))
+      .limit(1);
+
+    const session = sessions[0];
+    if (!session) return null;
+
+    // If still in progress, return status without candidates
+    if (session.status === 'in_progress') {
+      return {
+        sessionId: session.id,
+        status: 'in_progress',
+        searchQuery: session.searchQuery,
+        searchAddress: session.searchAddress,
+        resultCount: 0,
+        durationMs: null,
+        candidates: [],
+        hasMore: false,
+      };
+    }
+
+    // Fetch results, then load vendor details in a second query
+    const results = await this.db
+      .select()
+      .from(vendorSearchResults)
+      .where(eq(vendorSearchResults.searchSessionId, session.id));
+
+    const vendorIds = results.map((r) => r.vendorId);
+    const vendorRows =
+      vendorIds.length > 0
+        ? await this.db
+            .select()
+            .from(vendors)
+            .where(inArray(vendors.id, vendorIds))
+        : [];
+
+    const vendorMap = new Map(vendorRows.map((v) => [v.id, v]));
+
+    // Map DB rows to VendorCandidate[]
+    const candidates: VendorCandidate[] = results
+      .sort((a, b) => a.rank - b.rank)
+      .map((r) => {
+        const v = vendorMap.get(r.vendorId);
+        return {
+          vendorId: r.vendorId,
+          rank: r.rank,
+          score: Number(r.score),
+          name: v?.name ?? '',
+          phone: v?.phone ?? null,
+          phoneRaw: v?.phoneRaw ?? null,
+          address: v?.address ?? null,
+          website: v?.website ?? null,
+          email: (v?.email as ValidEmail) ?? null,
+          rating: toNumber(v?.rating ?? null),
+          reviewCount: v?.reviewCount ?? null,
+          distanceMeters: toNumber(r.distanceMeters),
+          categories: (v?.categories as string[]) ?? null,
+          googlePlaceId: v?.googlePlaceId ?? null,
+          sources: [],
+          scores: {
+            distance: toNumber(r.distanceScore),
+            rating: toNumber(r.ratingScore),
+            reviewCount: toNumber(r.reviewCountScore),
+            categoryMatch: toNumber(r.categoryMatchScore),
+            businessHours: toNumber(r.businessHoursScore),
+            credential: toNumber(r.credentialScore),
+          },
+        };
+      });
+
+    return {
+      sessionId: session.id,
+      status: session.status as VendorSearchResponse['status'],
+      searchQuery: session.searchQuery,
+      searchAddress: session.searchAddress,
+      resultCount: session.resultCount,
+      durationMs: session.durationMs,
+      candidates,
+      hasMore: false,
     };
   }
 
@@ -526,6 +657,94 @@ export class VendorSourcingService {
     }
 
     return vendorIds;
+  }
+
+  private buildDedupedScoringInputs(
+    vendorIds: string[],
+    places: NormalizedPlace[],
+    searchLat: number,
+    searchLng: number,
+    excludeVendorIds?: Set<string>,
+  ): { id: string; input: ScoringInput }[] {
+    const seen = new Set<string>(excludeVendorIds);
+    const inputs: { id: string; input: ScoringInput }[] = [];
+
+    for (let i = 0; i < places.length; i++) {
+      const vid = vendorIds[i];
+      if (seen.has(vid)) continue;
+      seen.add(vid);
+      inputs.push({
+        id: vid,
+        input: this.buildScoringInput(places[i], searchLat, searchLng),
+      });
+    }
+
+    return inputs;
+  }
+
+  private deduplicateByPhone(
+    places: NormalizedPlace[],
+    existingPhones: Set<string>,
+  ): NormalizedPlace[] {
+    const result: NormalizedPlace[] = [];
+
+    for (const p of places) {
+      const norm = normalizePhone(p.phone);
+      if (norm && existingPhones.has(norm)) continue;
+      result.push(p);
+      if (norm) existingPhones.add(norm);
+    }
+
+    return result;
+  }
+
+  private async geocodeMissingCoordinates(
+    places: NormalizedPlace[],
+  ): Promise<void> {
+    for (const p of places) {
+      if (p.latitude === null && p.longitude === null && p.address) {
+        const geo = await this.nominatim.geocode(p.address);
+        if (geo) {
+          p.latitude = geo.latitude;
+          p.longitude = geo.longitude;
+        }
+      }
+    }
+  }
+
+  private async insertSearchResults(
+    searchSessionId: string,
+    ranked: { id: string; rank: number; scored: ScoredResult }[],
+    vendorIds: string[],
+    places: NormalizedPlace[],
+    searchLat: number,
+    searchLng: number,
+  ): Promise<void> {
+    await this.db.insert(vendorSearchResults).values(
+      ranked.map((r) => {
+        const placeIdx = vendorIds.indexOf(r.id);
+        const p = placeIdx >= 0 ? places[placeIdx] : null;
+        const distMeters =
+          p?.latitude != null && p?.longitude != null
+            ? this.haversine(searchLat, searchLng, p.latitude, p.longitude)
+            : null;
+
+        return {
+          searchSessionId,
+          vendorId: r.id,
+          rank: r.rank,
+          score: String(r.scored.totalScore),
+          distanceScore: String(r.scored.distanceScore),
+          ratingScore: String(r.scored.ratingScore),
+          reviewCountScore: String(r.scored.reviewCountScore),
+          categoryMatchScore: String(r.scored.categoryMatchScore),
+          businessHoursScore: String(r.scored.businessHoursScore),
+          credentialScore: String(r.scored.credentialScore),
+          distanceMeters:
+            distMeters !== null ? String(distMeters.toFixed(2)) : null,
+        };
+      }),
+    );
   }
 
   private buildScoringInput(

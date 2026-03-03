@@ -11,7 +11,7 @@ import type {
 import { mapBuildZoomContractor } from '../mappers/buildzoom.mapper';
 import { FirecrawlService } from '../../firecrawl/firecrawl.service';
 
-const MAX_PROFILES = 10;
+const MAX_DISCOVERED_URLS = 10;
 const PROFILE_WAIT_MS = 2000;
 
 const CONTRACTOR_SCHEMA = {
@@ -68,6 +68,16 @@ export class BuildZoomProvider implements PlaceProvider {
     if (!this.isEnabled) return [];
     if (!params.locationName) return [];
 
+    const urls = await this.discoverProfileUrls(params);
+    if (urls.length === 0) return [];
+
+    return this.scrapeProfiles(urls);
+  }
+
+  async discoverProfileUrls(params: PlaceSearchParams): Promise<string[]> {
+    if (!this.isEnabled) return [];
+    if (!params.locationName) return [];
+
     const trade = params.tradeCategory ?? params.query;
     const searchUrl = buildSearchUrl(params.locationName, trade);
     this.logger.log(`BuildZoom search: "${trade}" in "${params.locationName}"`);
@@ -81,27 +91,32 @@ export class BuildZoomProvider implements PlaceProvider {
       return [];
     }
 
-    const profileUrls = extractProfileUrls(result.links).slice(0, MAX_PROFILES);
+    const profileUrls = extractProfileUrls(result.links).slice(0, MAX_DISCOVERED_URLS);
     if (profileUrls.length === 0) {
       this.logger.warn('No contractor profile URLs found on search page');
       return [];
     }
 
     this.logger.log(`Found ${profileUrls.length} BuildZoom profile URLs`);
+    return profileUrls;
+  }
+
+  async scrapeProfiles(urls: string[]): Promise<NormalizedPlace[]> {
+    if (urls.length === 0) return [];
 
     const settled = await Promise.allSettled(
-      profileUrls.map((url) => this.scrapeProfile(url)),
+      urls.map((url) => this.scrapeProfile(url)),
     );
 
-    const contractors: BuildZoomContractor[] = [];
-    for (const entry of settled) {
-      if (entry.status === 'fulfilled' && entry.value) {
-        contractors.push(entry.value);
-      }
-    }
+    const contractors = settled
+      .filter(
+        (entry): entry is PromiseFulfilledResult<BuildZoomContractor> =>
+          entry.status === 'fulfilled' && entry.value !== null,
+      )
+      .map((entry) => entry.value);
 
     this.logger.log(
-      `BuildZoom extracted ${contractors.length}/${profileUrls.length} profiles`,
+      `BuildZoom extracted ${contractors.length}/${urls.length} profiles`,
     );
 
     return contractors.map(mapBuildZoomContractor);
@@ -136,6 +151,14 @@ export class BuildZoomProvider implements PlaceProvider {
 
 // ── Helpers (exported for testing) ──────────────────────────────────────
 
+/** Maps trade category names to BuildZoom's URL slugs. */
+const BUILDZOOM_SLUG_MAP: Record<string, string> = {
+  electrical: 'electricians',
+  hvac: 'hvac-contractors',
+  'general maintenance': 'general-contractors',
+  'paving & asphalt': 'paving-contractors',
+};
+
 export function buildSearchUrl(
   locationName: string,
   query: string,
@@ -145,6 +168,11 @@ export function buildSearchUrl(
     .replace(/,\s*/g, '-')
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
+
+  const knownSlug = BUILDZOOM_SLUG_MAP[query.toLowerCase()];
+  if (knownSlug) {
+    return `https://www.buildzoom.com/${locationSlug}/${knownSlug}`;
+  }
 
   let tradeSlug = query.toLowerCase().replace(/\s+/g, '-');
   // Only pluralize profession nouns (plumber→plumbers, contractor→contractors).

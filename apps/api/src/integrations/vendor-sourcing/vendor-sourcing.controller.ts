@@ -1,10 +1,13 @@
 import {
   Controller,
   Get,
+  Header,
   Post,
   Param,
+  Query,
   Body,
   ParseUUIDPipe,
+  ParseIntPipe,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -33,6 +36,16 @@ export class VendorSourcingController {
     @Body() dto: SearchVendorsDto,
   ) {
     return this.vendorSourcingService.search(org.orgId, dto);
+  }
+
+  @Get('results')
+  @ApiOperation({ summary: 'Get vendor search results for a service request' })
+  @ApiResponse({ status: 200, description: 'Search results or null if none' })
+  async getResultsByServiceRequest(
+    @CurrentOrg() org: AuthOrganization,
+    @Query('serviceRequestBluefolderId', ParseIntPipe) bluefolderId: number,
+  ) {
+    return this.vendorSourcingService.getResultsByServiceRequest(org.orgId, bluefolderId);
   }
 
   @Get('sessions')
@@ -72,6 +85,7 @@ export class VendorSourcingController {
   }
 
   @Get('trade-categories')
+  @Header('Cache-Control', 'private, max-age=3600')
   @ApiOperation({ summary: 'List trade categories for the organization' })
   @ApiResponse({ status: 200, description: 'List of trade categories' })
   async listTradeCategories(@CurrentOrg() org: AuthOrganization) {

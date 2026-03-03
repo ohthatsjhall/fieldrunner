@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ServiceRequestsService } from './service-requests.service';
 import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
+import { SYNC_COMPLETED } from '../../common/events/sync.events';
 import type { ServiceRequestSummary } from '@fieldrunner/shared';
 
 function makeSummary(
@@ -58,6 +60,7 @@ describe('ServiceRequestsService', () => {
   let mockBlueFolderService: jest.Mocked<BlueFolderService>;
   let mockUsersService: jest.Mocked<BlueFolderUsersService>;
   let mockSettings: jest.Mocked<OrganizationSettingsService>;
+  let mockEventEmitter: jest.Mocked<EventEmitter2>;
   let mockDb: any;
 
   const clerkOrgId = 'org_test123';
@@ -83,6 +86,10 @@ describe('ServiceRequestsService', () => {
       deleteApiKey: jest.fn(),
     } as unknown as jest.Mocked<OrganizationSettingsService>;
 
+    mockEventEmitter = {
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<EventEmitter2>;
+
     mockDb = {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
@@ -101,6 +108,7 @@ describe('ServiceRequestsService', () => {
         { provide: BlueFolderService, useValue: mockBlueFolderService },
         { provide: BlueFolderUsersService, useValue: mockUsersService },
         { provide: OrganizationSettingsService, useValue: mockSettings },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DATABASE_CONNECTION, useValue: mockDb },
       ],
     }).compile();
@@ -193,6 +201,27 @@ describe('ServiceRequestsService', () => {
 
       const upsertedRows = mockDb.values.mock.calls[0][0];
       expect(upsertedRows[0].assigneeName).toBe(expected);
+    });
+
+    it('should emit sync.completed event with clerkOrgId and organizationId', async () => {
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary(),
+      ]);
+
+      await service.sync(clerkOrgId);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(SYNC_COMPLETED, {
+        clerkOrgId,
+        organizationId: internalOrgId,
+      });
+    });
+
+    it('should not emit sync.completed when no items to sync', async () => {
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([]);
+
+      await service.sync(clerkOrgId);
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('should continue SR sync even if user sync fails', async () => {
