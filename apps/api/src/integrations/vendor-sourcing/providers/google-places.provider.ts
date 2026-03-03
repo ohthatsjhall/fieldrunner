@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   PlaceProvider,
@@ -8,8 +8,7 @@ import type {
 import type { GooglePlacesTextSearchResponse } from '../types/google-places-api.types';
 import { mapGooglePlace } from '../mappers/google-places.mapper';
 
-const PLACES_API_URL =
-  'https://places.googleapis.com/v1/places:searchText';
+const PLACES_API_URL = 'https://places.googleapis.com/v1/places:searchText';
 
 const FIELD_MASK = [
   'places.id',
@@ -33,7 +32,6 @@ const FIELD_MASK = [
 export class GooglePlacesProvider implements PlaceProvider {
   readonly name = 'google_places';
 
-  private readonly logger = new Logger(GooglePlacesProvider.name);
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService) {

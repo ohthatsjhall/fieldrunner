@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   NominatimSearchResult,
@@ -9,7 +9,6 @@ const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
 @Injectable()
 export class NominatimProvider {
-  private readonly logger = new Logger(NominatimProvider.name);
   private readonly userAgent: string;
 
   constructor(private readonly config: ConfigService) {
