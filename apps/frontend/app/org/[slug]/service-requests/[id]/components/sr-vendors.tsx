@@ -44,6 +44,16 @@ function formatPhone(phone: string | null, phoneRaw: string | null): string {
   return phone;
 }
 
+const HIDDEN_CATEGORIES = new Set([
+  'point_of_interest',
+  'establishment',
+  'store',
+]);
+
+function filterCategories(categories: string[]): string[] {
+  return categories.filter((c) => !HIDDEN_CATEGORIES.has(c.toLowerCase()));
+}
+
 function formatCategory(cat: string): string {
   return cat
     .replace(/_/g, ' ')
@@ -71,9 +81,12 @@ function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
           {c.address && (
             <span className="text-xs text-muted-foreground">{c.address}</span>
           )}
-          {c.categories && c.categories.length > 0 && (
+          {c.categories && c.categories.length > 0 && (() => {
+            const filtered = filterCategories(c.categories);
+            if (filtered.length === 0) return null;
+            return (
             <div className="flex flex-wrap gap-1">
-              {c.categories.slice(0, 3).map((cat) => (
+              {filtered.slice(0, 3).map((cat) => (
                 <Badge
                   key={cat}
                   variant="outline"
@@ -82,13 +95,14 @@ function VendorRow({ candidate: c }: { candidate: VendorCandidate }) {
                   {formatCategory(cat)}
                 </Badge>
               ))}
-              {c.categories.length > 3 && (
+              {filtered.length > 3 && (
                 <span className="text-[10px] text-muted-foreground">
-                  +{c.categories.length - 3}
+                  +{filtered.length - 3}
                 </span>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
       </TableCell>
 
