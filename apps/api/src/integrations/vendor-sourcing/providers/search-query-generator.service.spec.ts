@@ -1,4 +1,3 @@
-import { mock, jest, describe, it, expect, beforeEach } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { SearchQueryGeneratorService } from './search-query-generator.service';
@@ -7,7 +6,8 @@ import type { ServiceRequestDetail } from '@fieldrunner/shared';
 // Shared mock for the create method
 const mockCreate = jest.fn();
 
-mock.module('@anthropic-ai/sdk', () => ({
+jest.mock('@anthropic-ai/sdk', () => ({
+  __esModule: true,
   default: jest.fn().mockImplementation(() => ({
     messages: { create: mockCreate },
   })),
