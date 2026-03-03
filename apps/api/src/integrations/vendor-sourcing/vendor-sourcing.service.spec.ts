@@ -520,84 +520,171 @@ describe('VendorSourcingService', () => {
     });
   });
 
-  describe('loadMore', () => {
-    it('should return empty candidates when session has no pending URLs', async () => {
+  describe('getResultsByServiceRequest', () => {
+    it('should return null when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 9999);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when SR exists but has no session', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup: where → orderBy → limit chain
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return in_progress status when session is still running', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'in_progress',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 0,
+              durationMs: null,
+            },
+          ]),
+        }),
+      });
+
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
+
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('in_progress');
+      expect(result!.candidates).toEqual([]);
+    });
+
+    it('should return completed results with candidates sorted by rank', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'completed',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 2,
+              durationMs: 5000,
+            },
+          ]),
+        }),
+      });
+      // Results lookup
       mockDb.where.mockResolvedValueOnce([
         {
-          id: 'session-uuid',
-          organizationId: internalOrgId,
-          pendingProfileUrls: null,
-          resultCount: 5,
-          searchLatitude: '30.2672',
-          searchLongitude: '-97.7431',
-          searchRadiusMeters: 40000,
+          vendorId: 'v-1',
+          rank: 2,
+          score: '75.5',
+          distanceMeters: '1500',
+          distanceScore: '80',
+          ratingScore: '70',
+          reviewCountScore: '60',
+          categoryMatchScore: '90',
+          businessHoursScore: '50',
+          credentialScore: '40',
+        },
+        {
+          vendorId: 'v-2',
+          rank: 1,
+          score: '85.0',
+          distanceMeters: '500',
+          distanceScore: '95',
+          ratingScore: '80',
+          reviewCountScore: '70',
+          categoryMatchScore: '90',
+          businessHoursScore: '60',
+          credentialScore: '50',
+        },
+      ]);
+      // Vendor lookup by inArray
+      mockDb.where.mockResolvedValueOnce([
+        {
+          id: 'v-1',
+          name: 'Vendor One',
+          phone: '5125550001',
+          phoneRaw: '(512) 555-0001',
+          address: '100 Test St',
+          website: 'https://one.com',
+          email: null,
+          rating: '4.5',
+          reviewCount: 100,
+          categories: ['plumber'],
+          googlePlaceId: 'ChIJ_1',
+        },
+        {
+          id: 'v-2',
+          name: 'Vendor Two',
+          phone: '5125550002',
+          phoneRaw: '(512) 555-0002',
+          address: '200 Test St',
+          website: null,
+          email: null,
+          rating: null,
+          reviewCount: null,
+          categories: null,
+          googlePlaceId: null,
         },
       ]);
 
-      const result = await service.loadMore(clerkOrgId, 'session-uuid');
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
 
-      expect(result.candidates).toEqual([]);
-      expect(result.hasMore).toBe(false);
-      expect(result.resultCount).toBe(5);
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('completed');
+      expect(result!.candidates).toHaveLength(2);
+      // Should be sorted by rank (1 before 2)
+      expect(result!.candidates[0].rank).toBe(1);
+      expect(result!.candidates[1].rank).toBe(2);
+      // Scores should be numbers, not strings
+      expect(typeof result!.candidates[0].score).toBe('number');
+      expect(result!.candidates[0].score).toBe(85.0);
     });
 
-    it('should return empty candidates when session not found', async () => {
+    it('should handle session with zero results gracefully', async () => {
+      // SR lookup
+      mockDb.where.mockReturnValueOnce([{ id: 'sr-uuid' }]);
+      // Session lookup
+      mockDb.where.mockReturnValueOnce({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([
+            {
+              id: 'session-uuid',
+              status: 'completed',
+              searchQuery: 'plumber',
+              searchAddress: '123 Main St',
+              resultCount: 0,
+              durationMs: 2000,
+            },
+          ]),
+        }),
+      });
+      // Results lookup (empty)
       mockDb.where.mockResolvedValueOnce([]);
 
-      const result = await service.loadMore(clerkOrgId, 'nonexistent');
+      const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
 
-      expect(result.candidates).toEqual([]);
-      expect(result.hasMore).toBe(false);
-    });
-
-    it('should scrape next batch of pending URLs', async () => {
-      // The loadMore method chains many DB queries via mockDb.where
-      // 1. Session lookup → session row
-      // 2. Existing results → [] (no existing results)
-      // 3. Vendor upsert lookup (phone dedup) → [] (no existing vendor)
-      // 4. Insert vendor → returning → [{id: 'new-vendor'}]
-      // 5. Insert vendor source record → onConflictDoNothing
-      // 6. Max rank query → [{maxRank: 5}]
-      // 7. Insert search results
-      // 8. Update session → where
-      mockDb.where
-        .mockResolvedValueOnce([
-          {
-            id: 'session-uuid',
-            organizationId: internalOrgId,
-            pendingProfileUrls: [
-              'https://www.buildzoom.com/contractor/bz-6',
-              'https://www.buildzoom.com/contractor/bz-7',
-            ],
-            resultCount: 5,
-            searchLatitude: '30.2672',
-            searchLongitude: '-97.7431',
-            searchRadiusMeters: 40000,
-          },
-        ])
-        // Existing results query
-        .mockResolvedValueOnce([])
-        // Vendor phone lookup (upsert)
-        .mockResolvedValueOnce([])
-        // Max rank query
-        .mockResolvedValueOnce([{ maxRank: 5 }])
-        // Update session
-        .mockResolvedValueOnce(undefined);
-
-      // Insert vendor → returning new vendor
-      mockDb.returning.mockResolvedValueOnce([{ id: 'new-vendor-uuid' }]);
-
-      mockBuildZoom.scrapeProfiles.mockResolvedValue([makeBzPlace()]);
-
-      const result = await service.loadMore(clerkOrgId, 'session-uuid');
-
-      expect(mockBuildZoom.scrapeProfiles).toHaveBeenCalledWith([
-        'https://www.buildzoom.com/contractor/bz-6',
-        'https://www.buildzoom.com/contractor/bz-7',
-      ]);
-      expect(result.candidates.length).toBeGreaterThan(0);
-      expect(result.hasMore).toBe(false);
-      expect(result.candidates[0].rank).toBe(6); // continues from max rank 5
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('completed');
+      expect(result!.candidates).toEqual([]);
     });
   });
+
 });

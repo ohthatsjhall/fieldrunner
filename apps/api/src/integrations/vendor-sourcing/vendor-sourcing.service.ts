@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, and, max, inArray, desc } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
   vendors,
@@ -28,7 +28,6 @@ import { EMPTY_CREDENTIALS } from './scoring/scoring.types';
 import type {
   VendorSearchResponse,
   VendorCandidate,
-  LoadMoreVendorsResponse,
   ValidEmail,
 } from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -42,6 +41,11 @@ type SearchParams = {
   radiusMeters?: number;
   initiatedBy?: string;
 };
+
+/** Convert a nullable string column to a number, or null. */
+function toNumber(value: string | null | undefined): number | null {
+  return value != null ? Number(value) : null;
+}
 
 @Injectable()
 export class VendorSourcingService {
@@ -191,10 +195,8 @@ export class VendorSourcingService {
       }
 
       // Collect BuildZoom results (dedup by phone, geocode missing coords)
-      let pendingProfileUrls: string[] = [];
       if (buildZoomResult.status === 'fulfilled') {
-        const { places: bzPlaces, pendingUrls } = buildZoomResult.value;
-        pendingProfileUrls = pendingUrls;
+        const bzPlaces = buildZoomResult.value;
         bzRawCount = bzPlaces.length;
 
         if (bzPlaces.length > 0) {
@@ -251,7 +253,6 @@ export class VendorSourcingService {
           status: 'completed',
           resultCount: ranked.length,
           sources: sourceCounts,
-          pendingProfileUrls: pendingProfileUrls.length > 0 ? pendingProfileUrls : null,
           durationMs,
           completedAt: new Date(),
         })
@@ -308,7 +309,7 @@ export class VendorSourcingService {
         resultCount: ranked.length,
         durationMs,
         candidates,
-        hasMore: pendingProfileUrls.length > 0,
+        hasMore: false,
       };
     } catch (error) {
       const durationMs = Date.now() - startTime;
@@ -375,8 +376,8 @@ export class VendorSourcingService {
     radiusMeters: number,
     locationName: string,
     tradeCategory?: string,
-  ): Promise<{ places: NormalizedPlace[]; pendingUrls: string[] }> {
-    if (!this.buildZoom.isEnabled) return { places: [], pendingUrls: [] };
+  ): Promise<NormalizedPlace[]> {
+    if (!this.buildZoom.isEnabled) return [];
 
     const params = {
       query,
@@ -388,14 +389,13 @@ export class VendorSourcingService {
     };
 
     const allUrls = await this.buildZoom.discoverProfileUrls(params);
-    if (allUrls.length === 0) return { places: [], pendingUrls: [] };
+    if (allUrls.length === 0) return [];
 
     this.logger.log(
       `BuildZoom URLs: ${allUrls.length} discovered, scraping all`,
     );
 
-    const places = await this.buildZoom.scrapeProfiles(allUrls);
-    return { places, pendingUrls: [] };
+    return this.buildZoom.scrapeProfiles(allUrls);
   }
 
   async getSession(organizationId: string, sessionId: string) {
@@ -477,7 +477,7 @@ export class VendorSourcingService {
       };
     }
 
-    // Fetch results joined with vendors
+    // Fetch results, then load vendor details in a second query
     const results = await this.db
       .select()
       .from(vendorSearchResults)
@@ -509,19 +509,19 @@ export class VendorSourcingService {
           address: v?.address ?? null,
           website: v?.website ?? null,
           email: (v?.email as ValidEmail) ?? null,
-          rating: v?.rating != null ? Number(v.rating) : null,
+          rating: toNumber(v?.rating ?? null),
           reviewCount: v?.reviewCount ?? null,
-          distanceMeters: r.distanceMeters != null ? Number(r.distanceMeters) : null,
+          distanceMeters: toNumber(r.distanceMeters),
           categories: (v?.categories as string[]) ?? null,
           googlePlaceId: v?.googlePlaceId ?? null,
           sources: [],
           scores: {
-            distance: r.distanceScore != null ? Number(r.distanceScore) : null,
-            rating: r.ratingScore != null ? Number(r.ratingScore) : null,
-            reviewCount: r.reviewCountScore != null ? Number(r.reviewCountScore) : null,
-            categoryMatch: r.categoryMatchScore != null ? Number(r.categoryMatchScore) : null,
-            businessHours: r.businessHoursScore != null ? Number(r.businessHoursScore) : null,
-            credential: r.credentialScore != null ? Number(r.credentialScore) : null,
+            distance: toNumber(r.distanceScore),
+            rating: toNumber(r.ratingScore),
+            reviewCount: toNumber(r.reviewCountScore),
+            categoryMatch: toNumber(r.categoryMatchScore),
+            businessHours: toNumber(r.businessHoursScore),
+            credential: toNumber(r.credentialScore),
           },
         };
       });
@@ -535,144 +535,6 @@ export class VendorSourcingService {
       durationMs: session.durationMs,
       candidates,
       hasMore: false,
-    };
-  }
-
-  async loadMore(
-    clerkOrgId: string,
-    sessionId: string,
-  ): Promise<LoadMoreVendorsResponse> {
-    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
-
-    // 1. Load session
-    const sessions = await this.db
-      .select()
-      .from(vendorSearchSessions)
-      .where(
-        and(
-          eq(vendorSearchSessions.id, sessionId),
-          eq(vendorSearchSessions.organizationId, organizationId),
-        ),
-      );
-
-    const session = sessions[0];
-    if (!session) {
-      return { sessionId, candidates: [], hasMore: false, resultCount: 0 };
-    }
-
-    const pendingUrls = (session.pendingProfileUrls as string[]) ?? [];
-    if (pendingUrls.length === 0) {
-      return {
-        sessionId,
-        candidates: [],
-        hasMore: false,
-        resultCount: session.resultCount,
-      };
-    }
-
-    // 2. Take next batch
-    const urlsToScrape = pendingUrls.slice(0, 5);
-    const remainingUrls = pendingUrls.slice(5);
-
-    // 3. Scrape profiles
-    this.logger.log(`Load-more scraping ${urlsToScrape.length} BuildZoom profiles`);
-    const bzPlaces = await this.buildZoom.scrapeProfiles(urlsToScrape);
-
-    // 4. Dedup against existing session vendors by phone
-    const existingResults = await this.db
-      .select({ vendorId: vendorSearchResults.vendorId })
-      .from(vendorSearchResults)
-      .where(eq(vendorSearchResults.searchSessionId, sessionId));
-
-    const existingVendorIds = new Set(existingResults.map((r) => r.vendorId));
-    const existingPhones = new Set<string>();
-
-    if (existingVendorIds.size > 0) {
-      const existingVendors = await this.db
-        .select({ phone: vendors.phone })
-        .from(vendors)
-        .where(inArray(vendors.id, [...existingVendorIds]));
-      for (const v of existingVendors) {
-        if (v.phone) existingPhones.add(v.phone);
-      }
-    }
-
-    const newPlaces = this.deduplicateByPhone(bzPlaces, existingPhones);
-    await this.geocodeMissingCoordinates(newPlaces);
-
-    // 5. Enrich emails
-    await this.emailEnrichment.enrichPlaces(newPlaces);
-
-    // 6. Upsert vendors
-    const vendorIds = await this.upsertVendors(organizationId, newPlaces);
-
-    // 7. Score new vendors (dedup by vendorId)
-    const searchLat = Number(session.searchLatitude);
-    const searchLng = Number(session.searchLongitude);
-
-    const scoringInputs = this.buildDedupedScoringInputs(
-      vendorIds,
-      newPlaces,
-      searchLat,
-      searchLng,
-      existingVendorIds,
-    );
-
-    const scored = this.scoring.scoreAndRank(
-      scoringInputs,
-      session.searchRadiusMeters,
-    );
-
-    // 8. Get current max rank
-    const [{ maxRank }] = await this.db
-      .select({ maxRank: max(vendorSearchResults.rank) })
-      .from(vendorSearchResults)
-      .where(eq(vendorSearchResults.searchSessionId, sessionId));
-
-    const startRank = (maxRank ?? 0) + 1;
-
-    // 9. Insert search results with continuing ranks
-    const rankedScored = scored.map((r, i) => ({
-      ...r,
-      rank: startRank + i,
-    }));
-
-    if (rankedScored.length > 0) {
-      await this.insertSearchResults(
-        sessionId,
-        rankedScored,
-        vendorIds,
-        newPlaces,
-        searchLat,
-        searchLng,
-      );
-    }
-
-    // 10. Update session
-    const newResultCount = session.resultCount + scored.length;
-    await this.db
-      .update(vendorSearchSessions)
-      .set({
-        pendingProfileUrls: remainingUrls.length > 0 ? remainingUrls : null,
-        resultCount: newResultCount,
-        updatedAt: new Date(),
-      })
-      .where(eq(vendorSearchSessions.id, sessionId));
-
-    // 11. Build response
-    const candidates = this.buildCandidates(
-      rankedScored,
-      vendorIds,
-      newPlaces,
-      searchLat,
-      searchLng,
-    );
-
-    return {
-      sessionId,
-      candidates,
-      hasMore: remainingUrls.length > 0,
-      resultCount: newResultCount,
     };
   }
 

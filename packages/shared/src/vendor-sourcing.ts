@@ -39,13 +39,6 @@ export type VendorSearchResponse = {
   hasMore: boolean;
 };
 
-export type LoadMoreVendorsResponse = {
-  sessionId: string;
-  candidates: VendorCandidate[];
-  hasMore: boolean;
-  resultCount: number;
-};
-
 export type VendorSearchRequest = {
   serviceRequestBluefolderId?: number;
   address?: string;
