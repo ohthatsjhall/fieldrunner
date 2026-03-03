@@ -173,7 +173,13 @@ export class VendorSourcingService {
 
       const [googleResult, buildZoomResult] = await Promise.allSettled([
         this.searchGoogle(searchQueries, geocoded, radiusMeters, sourceCounts),
-        this.searchBuildZoom(primaryQuery, geocoded, radiusMeters, locationName, tradeCategory),
+        this.searchBuildZoom(
+          primaryQuery,
+          geocoded,
+          radiusMeters,
+          locationName,
+          tradeCategory,
+        ),
       ]);
 
       // Collect Google results
@@ -224,14 +230,11 @@ export class VendorSourcingService {
       const scoringInputs = this.buildDedupedScoringInputs(
         vendorIds,
         allPlaces,
-        geocoded!.latitude,
-        geocoded!.longitude,
+        geocoded.latitude,
+        geocoded.longitude,
       );
 
-      const ranked = this.scoring.scoreAndRank(
-        scoringInputs,
-        radiusMeters,
-      );
+      const ranked = this.scoring.scoreAndRank(scoringInputs, radiusMeters);
 
       // 8. Insert search results
       if (ranked.length > 0) {
@@ -240,8 +243,8 @@ export class VendorSourcingService {
           ranked,
           vendorIds,
           allPlaces,
-          geocoded!.latitude,
-          geocoded!.longitude,
+          geocoded.latitude,
+          geocoded.longitude,
         );
       }
 
@@ -263,42 +266,47 @@ export class VendorSourcingService {
         .filter((p) => p.email !== null)
         .map((p) => `${p.name} <${p.email}>`);
 
-      this.logger.log([
-        `\n========== VENDOR SEARCH COMPLETE ==========`,
-        `Session:     ${session.id}`,
-        `Query:       ${searchQueries.join(' | ')}`,
-        `Address:     ${address}`,
-        `Duration:    ${(durationMs / 1000).toFixed(1)}s`,
-        ``,
-        `--- Sources ---`,
-        `Google Places: ${googleCount} vendor(s)`,
-        `BuildZoom:     ${bzRawCount} scraped → ${bzDedupedCount} after phone dedup`,
-        `Combined:      ${allPlaces.length} unique vendor(s)`,
-        ``,
-        `--- Email Enrichment ---`,
-        `Attempted:   ${allPlaces.filter((p) => p.email === null && p.website !== null).length + emailsFound} vendor(s) with websites`,
-        `Found:       ${emailsFound} new email(s)`,
-        emailVendors.length > 0
-          ? `Emails:      ${emailVendors.join(', ')}`
-          : `Emails:      none`,
-        ``,
-        `--- Scoring ---`,
-        `Ranked:      ${ranked.length} vendor(s)`,
-        `Top 5:       ${ranked.slice(0, 5).map((r) => {
-          const idx = vendorIds.indexOf(r.id);
-          const name = idx >= 0 ? allPlaces[idx]?.name : 'unknown';
-          return `${name} (${r.scored.totalScore.toFixed(1)})`;
-        }).join(', ')}`,
-        `============================================`,
-      ].join('\n'));
+      this.logger.log(
+        [
+          `\n========== VENDOR SEARCH COMPLETE ==========`,
+          `Session:     ${session.id}`,
+          `Query:       ${searchQueries.join(' | ')}`,
+          `Address:     ${address}`,
+          `Duration:    ${(durationMs / 1000).toFixed(1)}s`,
+          ``,
+          `--- Sources ---`,
+          `Google Places: ${googleCount} vendor(s)`,
+          `BuildZoom:     ${bzRawCount} scraped → ${bzDedupedCount} after phone dedup`,
+          `Combined:      ${allPlaces.length} unique vendor(s)`,
+          ``,
+          `--- Email Enrichment ---`,
+          `Attempted:   ${allPlaces.filter((p) => p.email === null && p.website !== null).length + emailsFound} vendor(s) with websites`,
+          `Found:       ${emailsFound} new email(s)`,
+          emailVendors.length > 0
+            ? `Emails:      ${emailVendors.join(', ')}`
+            : `Emails:      none`,
+          ``,
+          `--- Scoring ---`,
+          `Ranked:      ${ranked.length} vendor(s)`,
+          `Top 5:       ${ranked
+            .slice(0, 5)
+            .map((r) => {
+              const idx = vendorIds.indexOf(r.id);
+              const name = idx >= 0 ? allPlaces[idx]?.name : 'unknown';
+              return `${name} (${r.scored.totalScore.toFixed(1)})`;
+            })
+            .join(', ')}`,
+          `============================================`,
+        ].join('\n'),
+      );
 
       // 10. Build response
       const candidates = this.buildCandidates(
         ranked,
         vendorIds,
         allPlaces,
-        geocoded!.latitude,
-        geocoded!.longitude,
+        geocoded.latitude,
+        geocoded.longitude,
       );
 
       return {
@@ -325,7 +333,10 @@ export class VendorSourcingService {
         })
         .where(eq(vendorSearchSessions.id, session.id));
 
-      this.logger.error(`Vendor search failed: ${errorMessage}`, error instanceof Error ? error.stack : error);
+      this.logger.error(
+        `Vendor search failed: ${errorMessage}`,
+        error instanceof Error ? error.stack : error,
+      );
 
       return {
         sessionId: session.id,
@@ -624,8 +635,7 @@ export class VendorSourcingService {
             longitude: p.longitude !== null ? String(p.longitude) : null,
             website: p.website,
             email: p.email,
-            googlePlaceId:
-              p.source === 'google_places' ? p.sourceId : null,
+            googlePlaceId: p.source === 'google_places' ? p.sourceId : null,
             rating: p.rating !== null ? String(p.rating) : null,
             reviewCount: p.reviewCount,
             categories: p.types,
@@ -774,9 +784,10 @@ export class VendorSourcingService {
     const licenses = raw.licenses ?? [];
 
     return {
-      hasActiveLicense: licenses.length > 0
-        ? licenses.some((l) => l.licenseStatus === 'Active')
-        : null,
+      hasActiveLicense:
+        licenses.length > 0
+          ? licenses.some((l) => l.licenseStatus === 'Active')
+          : null,
       licenseCount: licenses.length,
       bzScore: raw.bzScore ? parseInt(raw.bzScore, 10) || null : null,
       isInsured: raw.insurer != null ? true : null,
@@ -871,8 +882,7 @@ export class VendorSourcingService {
         reviewCount: p?.reviewCount ?? null,
         distanceMeters,
         categories: p?.types ?? null,
-        googlePlaceId:
-          p?.source === 'google_places' ? p.sourceId : null,
+        googlePlaceId: p?.source === 'google_places' ? p.sourceId : null,
         sources: p ? [p.source] : [],
         scores: {
           distance: r.scored.distanceScore,

@@ -30,9 +30,7 @@ export class EmailEnrichmentService {
 
     if (targets.length === 0) return;
 
-    this.logger.log(
-      `Email enrichment: ${targets.length} vendor(s) to scrape`,
-    );
+    this.logger.log(`Email enrichment: ${targets.length} vendor(s) to scrape`);
 
     for (let i = 0; i < targets.length; i += CHUNK_SIZE) {
       const chunk = targets.slice(i, i + CHUNK_SIZE);

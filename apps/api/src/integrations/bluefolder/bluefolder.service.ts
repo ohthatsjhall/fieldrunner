@@ -1,8 +1,15 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { BlueFolderClientService, BlueFolderApiError } from './bluefolder-client.service';
+import {
+  BlueFolderClientService,
+  BlueFolderApiError,
+} from './bluefolder-client.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
-import { mapServiceRequestListItem, mapServiceRequestDetail, mapServiceRequestFile } from './mappers';
+import {
+  mapServiceRequestListItem,
+  mapServiceRequestDetail,
+  mapServiceRequestFile,
+} from './mappers';
 import type {
   BfServiceRequestListResponse,
   BfServiceRequestGetResponse,
@@ -50,7 +57,10 @@ export class BlueFolderService {
 
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
     const managerIds = this.collectSummaryUserIds(summaries);
-    const userMap = await this.usersService.buildUserMap(organizationId, managerIds);
+    const userMap = await this.usersService.buildUserMap(
+      organizationId,
+      managerIds,
+    );
     this.enrichSummaries(summaries, userMap);
 
     return summaries;
@@ -76,7 +86,10 @@ export class BlueFolderService {
 
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
     const userIds = this.collectDetailUserIds(detail);
-    const userMap = await this.usersService.buildUserMap(organizationId, userIds);
+    const userMap = await this.usersService.buildUserMap(
+      organizationId,
+      userIds,
+    );
     this.enrichDetail(detail, userMap);
 
     return detail;

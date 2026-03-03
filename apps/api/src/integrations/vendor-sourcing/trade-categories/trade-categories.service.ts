@@ -28,10 +28,7 @@ export class TradeCategoriesService {
       isDefault: true,
     }));
 
-    await this.db
-      .insert(tradeCategories)
-      .values(values)
-      .onConflictDoNothing();
+    await this.db.insert(tradeCategories).values(values).onConflictDoNothing();
   }
 
   async findAll(organizationId: string) {

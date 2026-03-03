@@ -16,9 +16,7 @@ export function mapServiceRequestFile(
 ): ServiceRequestFile {
   return {
     serviceRequestFileId: toNumber(f.serviceRequestFileId),
-    serviceRequestSignedDocumentId: toNumber(
-      f.serviceRequestSignedDocumentId,
-    ),
+    serviceRequestSignedDocumentId: toNumber(f.serviceRequestSignedDocumentId),
     isExternalLink: toBool(f.isExternalLink),
     isSignedDocument: toBool(f.isSignedDocument),
     fileDescription: f.fileDescription ?? '',

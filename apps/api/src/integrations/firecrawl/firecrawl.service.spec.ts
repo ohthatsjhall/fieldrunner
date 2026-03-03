@@ -253,10 +253,7 @@ describe('FirecrawlService', () => {
         ok: true,
         json: async () => ({
           success: true,
-          links: [
-            'https://example.com/page1',
-            'https://example.com/page2',
-          ],
+          links: ['https://example.com/page1', 'https://example.com/page2'],
         }),
       });
 

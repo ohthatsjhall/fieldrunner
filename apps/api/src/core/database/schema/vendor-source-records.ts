@@ -49,9 +49,7 @@ export const vendorSourceRecords = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [
-    unique('uq_vendor_source').on(t.vendorId, t.source, t.sourceId),
-  ],
+  (t) => [unique('uq_vendor_source').on(t.vendorId, t.source, t.sourceId)],
 );
 
 export const vendorSourceRecordsRelations = relations(

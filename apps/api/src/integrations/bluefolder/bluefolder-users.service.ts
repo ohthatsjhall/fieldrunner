@@ -1,4 +1,9 @@
-import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { eq, inArray, and, sql } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';

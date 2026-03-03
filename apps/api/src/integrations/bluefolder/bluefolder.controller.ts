@@ -6,7 +6,12 @@ import {
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
 import { BlueFolderService } from './bluefolder.service';

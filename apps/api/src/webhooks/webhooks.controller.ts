@@ -24,8 +24,14 @@ export class WebhooksController {
   @Public()
   @HttpCode(200)
   @ApiOperation({ summary: 'Receive and process Clerk webhook events' })
-  @ApiResponse({ status: 200, description: 'Webhook processed or duplicate detected' })
-  @ApiResponse({ status: 400, description: 'Invalid signature or missing headers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook processed or duplicate detected',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid signature or missing headers',
+  })
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers() headers: Record<string, string>,

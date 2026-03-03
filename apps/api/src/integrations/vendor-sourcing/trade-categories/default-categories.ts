@@ -14,13 +14,21 @@ export const DEFAULT_TRADE_CATEGORIES: DefaultCategory[] = [
   },
   {
     name: 'Electrical',
-    searchQueries: ['electrician', 'electrical contractor', 'electrical service'],
+    searchQueries: [
+      'electrician',
+      'electrical contractor',
+      'electrical service',
+    ],
     googlePlacesType: 'electrician',
     relatedCategories: ['General Maintenance'],
   },
   {
     name: 'HVAC',
-    searchQueries: ['hvac contractor', 'heating and cooling', 'air conditioning repair'],
+    searchQueries: [
+      'hvac contractor',
+      'heating and cooling',
+      'air conditioning repair',
+    ],
     googlePlacesType: null,
     relatedCategories: ['Electrical', 'General Maintenance'],
   },
@@ -62,7 +70,11 @@ export const DEFAULT_TRADE_CATEGORIES: DefaultCategory[] = [
   },
   {
     name: 'Janitorial',
-    searchQueries: ['janitorial service', 'commercial cleaning', 'cleaning service'],
+    searchQueries: [
+      'janitorial service',
+      'commercial cleaning',
+      'cleaning service',
+    ],
     googlePlacesType: null,
     relatedCategories: [],
   },

@@ -55,9 +55,7 @@ export const vendors = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [
-    unique('uq_org_vendor_phone').on(t.organizationId, t.phone),
-  ],
+  (t) => [unique('uq_org_vendor_phone').on(t.organizationId, t.phone)],
 );
 
 export const vendorsRelations = relations(vendors, ({ one }) => ({

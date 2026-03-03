@@ -84,7 +84,9 @@ export class SearchQueryGeneratorService {
 
     if (sr.equipment.length > 0) {
       const equipNames = sr.equipment
-        .map((e) => [e.equipName, e.equipType, e.mfrName].filter(Boolean).join(' '))
+        .map((e) =>
+          [e.equipName, e.equipType, e.mfrName].filter(Boolean).join(' '),
+        )
         .join(', ');
       parts.push(`Equipment: ${equipNames}`);
     }
@@ -103,7 +105,10 @@ export class SearchQueryGeneratorService {
   ): GeneratedSearchQueries {
     try {
       // Strip markdown code fences if present
-      const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+      const cleaned = text
+        .replace(/```json?\n?/g, '')
+        .replace(/```/g, '')
+        .trim();
       const parsed = JSON.parse(cleaned);
 
       if (

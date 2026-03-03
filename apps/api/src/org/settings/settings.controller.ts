@@ -1,5 +1,10 @@
 import { Controller, Get, Put, Delete, Body, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CurrentOrg } from '../../core/auth/decorators';
 import type { AuthOrganization } from '@fieldrunner/shared';
 import { OrganizationSettingsService } from './settings.service';
@@ -12,7 +17,9 @@ export class OrganizationSettingsController {
   constructor(private readonly settingsService: OrganizationSettingsService) {}
 
   @Get('bluefolder-api-key')
-  @ApiOperation({ summary: 'Get BlueFolder API key status for the organization' })
+  @ApiOperation({
+    summary: 'Get BlueFolder API key status for the organization',
+  })
   @ApiResponse({ status: 200, description: 'API key settings retrieved' })
   getSettings(@CurrentOrg() org: AuthOrganization) {
     return this.settingsService.getSettings(org.orgId);

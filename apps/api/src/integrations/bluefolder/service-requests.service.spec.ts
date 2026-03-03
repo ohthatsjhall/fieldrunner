@@ -192,16 +192,19 @@ describe('ServiceRequestsService', () => {
         accountManagerName: null,
         expected: null,
       },
-    ])('should map assigneeName correctly when $label', async ({ serviceManagerName, accountManagerName, expected }) => {
-      mockBlueFolderService.listServiceRequests.mockResolvedValue([
-        makeSummary({ serviceManagerName, accountManagerName }),
-      ]);
+    ])(
+      'should map assigneeName correctly when $label',
+      async ({ serviceManagerName, accountManagerName, expected }) => {
+        mockBlueFolderService.listServiceRequests.mockResolvedValue([
+          makeSummary({ serviceManagerName, accountManagerName }),
+        ]);
 
-      await service.sync(clerkOrgId);
+        await service.sync(clerkOrgId);
 
-      const upsertedRows = mockDb.values.mock.calls[0][0];
-      expect(upsertedRows[0].assigneeName).toBe(expected);
-    });
+        const upsertedRows = mockDb.values.mock.calls[0][0];
+        expect(upsertedRows[0].assigneeName).toBe(expected);
+      },
+    );
 
     it('should emit sync.completed event with clerkOrgId and organizationId', async () => {
       mockBlueFolderService.listServiceRequests.mockResolvedValue([
@@ -275,7 +278,12 @@ describe('ServiceRequestsService', () => {
 
       const stats = await service.getStats(clerkOrgId);
 
-      expect(stats).toEqual({ newCount: 0, inProgress: 0, assigned: 0, open: 0 });
+      expect(stats).toEqual({
+        newCount: 0,
+        inProgress: 0,
+        assigned: 0,
+        open: 0,
+      });
     });
   });
 
@@ -318,9 +326,9 @@ describe('ServiceRequestsService', () => {
 
       expect(mockSettings.resolveOrgId).toHaveBeenCalledWith('org_aaa');
       expect(mockSettings.resolveOrgId).toHaveBeenCalledWith('org_bbb');
-      expect(
-        mockBlueFolderService.listServiceRequests,
-      ).toHaveBeenCalledTimes(2);
+      expect(mockBlueFolderService.listServiceRequests).toHaveBeenCalledTimes(
+        2,
+      );
     });
 
     it('should stagger 3s between orgs but not after the last', async () => {
@@ -356,9 +364,9 @@ describe('ServiceRequestsService', () => {
 
       await service.syncAll();
 
-      expect(
-        mockBlueFolderService.listServiceRequests,
-      ).toHaveBeenCalledTimes(2);
+      expect(mockBlueFolderService.listServiceRequests).toHaveBeenCalledTimes(
+        2,
+      );
     });
   });
 });

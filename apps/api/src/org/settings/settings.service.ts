@@ -2,7 +2,10 @@ import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { eq, and, isNull } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
-import { organizations, organizationSettings } from '../../core/database/schema';
+import {
+  organizations,
+  organizationSettings,
+} from '../../core/database/schema';
 import { encrypt, decrypt } from '../../common/utils/crypto.util';
 
 @Injectable()

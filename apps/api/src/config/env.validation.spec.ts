@@ -99,9 +99,9 @@ describe('env.validation', () => {
     });
 
     it('should reject short ENCRYPTION_KEY', () => {
-      expect(() =>
-        validate(validEnv({ ENCRYPTION_KEY: 'abcdef' })),
-      ).toThrow('Environment validation failed');
+      expect(() => validate(validEnv({ ENCRYPTION_KEY: 'abcdef' }))).toThrow(
+        'Environment validation failed',
+      );
     });
 
     it('should reject non-hex ENCRYPTION_KEY', () => {
@@ -126,9 +126,9 @@ describe('env.validation', () => {
     });
 
     it('should reject empty CLERK_SECRET_KEY', () => {
-      expect(() =>
-        validate(validEnv({ CLERK_SECRET_KEY: '' })),
-      ).toThrow('Environment validation failed');
+      expect(() => validate(validEnv({ CLERK_SECRET_KEY: '' }))).toThrow(
+        'Environment validation failed',
+      );
     });
   });
 
@@ -168,9 +168,9 @@ describe('env.validation', () => {
     });
 
     it('should reject invalid NODE_ENV values', () => {
-      expect(() =>
-        validate(validEnv({ NODE_ENV: 'staging' })),
-      ).toThrow('Environment validation failed');
+      expect(() => validate(validEnv({ NODE_ENV: 'staging' }))).toThrow(
+        'Environment validation failed',
+      );
     });
   });
 
@@ -203,17 +203,17 @@ describe('env.validation', () => {
     });
 
     it('should reject an invalid URL', () => {
-      expect(() =>
-        validate(validEnv({ FRONTEND_URL: 'not-a-url' })),
-      ).toThrow('Environment validation failed');
+      expect(() => validate(validEnv({ FRONTEND_URL: 'not-a-url' }))).toThrow(
+        'Environment validation failed',
+      );
     });
   });
 
   describe('error output', () => {
     it('should report all missing required fields at once', () => {
-      expect(() =>
-        validate({ NODE_ENV: 'development' }),
-      ).toThrow('Environment validation failed');
+      expect(() => validate({ NODE_ENV: 'development' })).toThrow(
+        'Environment validation failed',
+      );
     });
   });
 });

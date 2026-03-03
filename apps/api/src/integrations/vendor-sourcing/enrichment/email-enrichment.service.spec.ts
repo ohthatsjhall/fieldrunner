@@ -4,9 +4,7 @@ import { FirecrawlService } from '../../firecrawl/firecrawl.service';
 import type { NormalizedPlace } from '../providers/provider.interface';
 import type { ValidEmail } from '@fieldrunner/shared';
 
-function makePlace(
-  overrides: Partial<NormalizedPlace> = {},
-): NormalizedPlace {
+function makePlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace {
   return {
     sourceId: 'ChIJ_test',
     source: 'google_places',
@@ -158,7 +156,10 @@ describe('EmailEnrichmentService', () => {
     });
 
     const places = [
-      makePlace({ email: 'already@here.com' as ValidEmail, website: 'https://here.com' }),
+      makePlace({
+        email: 'already@here.com' as ValidEmail,
+        website: 'https://here.com',
+      }),
       makePlace({ website: null }),
       makePlace({ sourceId: '3', website: 'https://needsemail.com' }),
     ];

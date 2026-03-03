@@ -8,7 +8,11 @@ export type ScoringWeights = {
 };
 
 export type CategoryMatchLevel = 'exact' | 'related' | 'fuzzy' | 'none';
-export type BusinessHoursStatus = 'open' | 'closing_soon' | 'unknown' | 'closed';
+export type BusinessHoursStatus =
+  | 'open'
+  | 'closing_soon'
+  | 'unknown'
+  | 'closed';
 
 export type CredentialSignals = {
   hasActiveLicense: boolean | null;
@@ -48,10 +52,10 @@ export type ScoredResult = {
 };
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-  distance: 0.30,
+  distance: 0.3,
   rating: 0.25,
-  reviewCount: 0.10,
-  categoryMatch: 0.10,
+  reviewCount: 0.1,
+  categoryMatch: 0.1,
   businessHours: 0.05,
-  credential: 0.20,
+  credential: 0.2,
 };

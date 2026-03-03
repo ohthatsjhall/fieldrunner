@@ -3,9 +3,7 @@
  * Assumes US/CA (+1) for 10-digit numbers.
  * Returns null if the input cannot be parsed as a valid phone number.
  */
-export function normalizePhone(
-  raw: string | null | undefined,
-): string | null {
+export function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw || !raw.trim()) return null;
 
   // Strip extensions (ext, ext., x, etc.)

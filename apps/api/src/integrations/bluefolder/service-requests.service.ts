@@ -31,7 +31,10 @@ const MAX_CACHE_SIZE = 50;
 @Injectable()
 export class ServiceRequestsService {
   private readonly logger = new Logger(ServiceRequestsService.name);
-  private readonly findAllCache = new Map<string, CacheEntry<(typeof serviceRequests.$inferSelect)[]>>();
+  private readonly findAllCache = new Map<
+    string,
+    CacheEntry<(typeof serviceRequests.$inferSelect)[]>
+  >();
 
   constructor(
     @Inject(DATABASE_CONNECTION)
@@ -77,12 +80,8 @@ export class ServiceRequestsService {
       isOverdue: sr.isOverdue,
       billableTotal: String(sr.billableTotal),
       costTotal: String(sr.costTotal),
-      dateTimeCreated: sr.dateTimeCreated
-        ? new Date(sr.dateTimeCreated)
-        : null,
-      dateTimeClosed: sr.dateTimeClosed
-        ? new Date(sr.dateTimeClosed)
-        : null,
+      dateTimeCreated: sr.dateTimeCreated ? new Date(sr.dateTimeCreated) : null,
+      dateTimeClosed: sr.dateTimeClosed ? new Date(sr.dateTimeClosed) : null,
       syncedAt,
       updatedAt: syncedAt,
     }));

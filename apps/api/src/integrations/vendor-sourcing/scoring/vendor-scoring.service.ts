@@ -35,9 +35,7 @@ export class VendorScoringService {
     );
     const ratingScore = this.calcRatingScore(input.rating, input.reviewCount);
     const reviewCountScore = this.calcReviewCountScore(input.reviewCount);
-    const categoryMatchScore = this.calcCategoryMatchScore(
-      input.categoryMatch,
-    );
+    const categoryMatchScore = this.calcCategoryMatchScore(input.categoryMatch);
     const businessHoursScore = this.calcBusinessHoursScore(
       input.businessHoursStatus,
     );
