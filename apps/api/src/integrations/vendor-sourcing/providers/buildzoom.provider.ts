@@ -151,6 +151,14 @@ export class BuildZoomProvider implements PlaceProvider {
 
 // ── Helpers (exported for testing) ──────────────────────────────────────
 
+/** Maps trade category names to BuildZoom's URL slugs. */
+const BUILDZOOM_SLUG_MAP: Record<string, string> = {
+  electrical: 'electricians',
+  hvac: 'hvac-contractors',
+  'general maintenance': 'general-contractors',
+  'paving & asphalt': 'paving-contractors',
+};
+
 export function buildSearchUrl(
   locationName: string,
   query: string,
@@ -160,6 +168,11 @@ export function buildSearchUrl(
     .replace(/,\s*/g, '-')
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
+
+  const knownSlug = BUILDZOOM_SLUG_MAP[query.toLowerCase()];
+  if (knownSlug) {
+    return `https://www.buildzoom.com/${locationSlug}/${knownSlug}`;
+  }
 
   let tradeSlug = query.toLowerCase().replace(/\s+/g, '-');
   // Only pluralize profession nouns (plumber→plumbers, contractor→contractors).

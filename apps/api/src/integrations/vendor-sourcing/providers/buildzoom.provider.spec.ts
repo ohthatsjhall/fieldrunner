@@ -387,6 +387,23 @@ describe('buildSearchUrl', () => {
     const url = buildSearchUrl('Pittsburgh, PA', 'plumbing');
     expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/plumbing');
   });
+
+  it('should map "Electrical" to "electricians" via known slug', () => {
+    const url = buildSearchUrl('Fremont, OH', 'Electrical');
+    expect(url).toBe('https://www.buildzoom.com/fremont-oh/electricians');
+  });
+
+  it('should map "HVAC" to "hvac-contractors" via known slug', () => {
+    const url = buildSearchUrl('Pittsburgh, PA', 'HVAC');
+    expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/hvac-contractors');
+  });
+
+  it('should map "General Maintenance" to "general-contractors" via known slug', () => {
+    const url = buildSearchUrl('Pittsburgh, PA', 'General Maintenance');
+    expect(url).toBe(
+      'https://www.buildzoom.com/pittsburgh-pa/general-contractors',
+    );
+  });
 });
 
 // ── extractProfileUrls ──────────────────────────────────────────────
