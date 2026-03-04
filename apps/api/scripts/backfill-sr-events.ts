@@ -13,6 +13,7 @@ import type {
   BfServiceRequestHistoryResponse,
   BfServiceRequestHistoryEntry,
 } from '../src/integrations/bluefolder/types/bluefolder-api.types';
+import { parseStatusChange } from '../src/integrations/bluefolder/utils/parse-status-change';
 
 const RATE_LIMIT_DELAY_MS = 1200; // ~50 req/min, conservative rate limit
 const PROGRESS_INTERVAL = 10;
@@ -83,54 +84,15 @@ async function main() {
     let totalEvents = 0;
 
     for (const sr of srs) {
-      let historyEntries: BfServiceRequestHistoryEntry[];
-
-      try {
-        const result =
-          await client.request<BfServiceRequestHistoryResponse>(
-            'serviceRequests/getHistory.aspx',
-            apiKey,
-            { serviceRequestId: String(sr.bluefolderId) },
-          );
-        historyEntries =
-          result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
-      } catch (error: any) {
-        if (error?.statusCode === 429 || error?.name === 'BlueFolderRateLimitError') {
-          const retryAfter = error.retryAfterSeconds ?? 60;
-          console.log(`  Rate limited. Waiting ${retryAfter}s...`);
-          await delay(retryAfter * 1000);
-          // Retry once
-          try {
-            const result =
-              await client.request<BfServiceRequestHistoryResponse>(
-                'serviceRequests/getHistory.aspx',
-                apiKey,
-                { serviceRequestId: String(sr.bluefolderId) },
-              );
-            historyEntries =
-              result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
-          } catch {
-            console.error(`  Failed SR ${sr.bluefolderId} after retry, skipping`);
-            processed++;
-            continue;
-          }
-        } else {
-          console.error(
-            `  Failed SR ${sr.bluefolderId}: ${error?.message ?? error}`,
-          );
-          processed++;
-          continue;
-        }
-      }
-
-      // Debug: log first SR's raw entries to understand the data shape
-      if (processed === 0) {
-        console.log('  [DEBUG] Sample history entries for first SR:');
-        for (const e of historyEntries.slice(0, 5)) {
-          console.log(`    id="${e.id}" entryType="${e.entryType}" description="${e.description}"`);
-        }
-        const allTypes = [...new Set(historyEntries.map((e) => e.entryType))];
-        console.log(`  [DEBUG] All entryTypes: ${allTypes.join(', ')}`);
+      const historyEntries = await fetchHistoryWithRetry(
+        client,
+        apiKey,
+        String(sr.bluefolderId),
+      );
+      if (!historyEntries) {
+        processed++;
+        await delay(RATE_LIMIT_DELAY_MS);
+        continue;
       }
 
       // Filter to status changes and creation entries
@@ -216,11 +178,17 @@ async function main() {
       }
 
       if (eventRows.length > 0) {
-        await db
-          .insert(serviceRequestEvents)
-          .values(eventRows)
-          .onConflictDoNothing();
-        totalEvents += eventRows.length;
+        try {
+          await db
+            .insert(serviceRequestEvents)
+            .values(eventRows)
+            .onConflictDoNothing();
+          totalEvents += eventRows.length;
+        } catch (insertErr: any) {
+          console.error(
+            `  Failed to insert events for SR ${sr.bluefolderId}: ${insertErr?.message ?? insertErr}`,
+          );
+        }
       }
 
       processed++;
@@ -240,24 +208,45 @@ async function main() {
   process.exit(0);
 }
 
-function parseStatusChange(
-  description: string,
-): { fromStatus: string | null; toStatus: string } | null {
-  // "Status changed from [X] to [Y]."
-  const fullMatch = description.match(
-    /Status changed from \[(.+?)\] to \[(.+?)\]/i,
-  );
-  if (fullMatch) {
-    return { fromStatus: fullMatch[1].trim(), toStatus: fullMatch[2].trim() };
+async function fetchHistoryWithRetry(
+  client: BlueFolderClientService,
+  apiKey: string,
+  bluefolderId: string,
+): Promise<BfServiceRequestHistoryEntry[] | null> {
+  try {
+    const result = await client.request<BfServiceRequestHistoryResponse>(
+      'serviceRequests/getHistory.aspx',
+      apiKey,
+      { serviceRequestId: bluefolderId },
+    );
+    return result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
+  } catch (error: any) {
+    if (
+      error?.statusCode === 429 ||
+      error?.name === 'BlueFolderRateLimitError'
+    ) {
+      const retryAfter = error.retryAfterSeconds ?? 60;
+      console.log(`  Rate limited. Waiting ${retryAfter}s...`);
+      await delay(retryAfter * 1000);
+      try {
+        const result = await client.request<BfServiceRequestHistoryResponse>(
+          'serviceRequests/getHistory.aspx',
+          apiKey,
+          { serviceRequestId: bluefolderId },
+        );
+        return result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
+      } catch (retryErr: any) {
+        console.error(
+          `  Failed SR ${bluefolderId} after retry: ${retryErr?.message ?? retryErr}`,
+        );
+        return null;
+      }
+    }
+    console.error(
+      `  Failed SR ${bluefolderId}: ${error?.message ?? error}`,
+    );
+    return null;
   }
-
-  // "Status changed to [Y]."
-  const toOnlyMatch = description.match(/Status changed to \[(.+?)\]/i);
-  if (toOnlyMatch) {
-    return { fromStatus: null, toStatus: toOnlyMatch[1].trim() };
-  }
-
-  return null;
 }
 
 function delay(ms: number): Promise<void> {
