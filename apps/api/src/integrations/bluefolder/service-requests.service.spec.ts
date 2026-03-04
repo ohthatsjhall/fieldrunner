@@ -371,7 +371,11 @@ describe('ServiceRequestsService', () => {
 
       mockBlueFolderService.listServiceRequests.mockResolvedValue([
         makeSummary({ serviceRequestId: 1001, status: 'In Progress' }),
-        makeSummary({ serviceRequestId: 1002, status: 'Closed', isOpen: false }),
+        makeSummary({
+          serviceRequestId: 1002,
+          status: 'Closed',
+          isOpen: false,
+        }),
       ]);
 
       const insertedValues: any[] = [];
@@ -414,9 +418,9 @@ describe('ServiceRequestsService', () => {
           insertedValues.push(vals);
           return {
             onConflictDoUpdate: jest.fn().mockReturnValue({
-              returning: jest.fn().mockResolvedValue([
-                { id: 'new-sr-uuid', bluefolderId: 9999 },
-              ]),
+              returning: jest
+                .fn()
+                .mockResolvedValue([{ id: 'new-sr-uuid', bluefolderId: 9999 }]),
             }),
             onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
           };

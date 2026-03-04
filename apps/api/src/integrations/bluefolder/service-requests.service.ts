@@ -76,10 +76,7 @@ export class ServiceRequestsService {
       .from(serviceRequests)
       .where(eq(serviceRequests.organizationId, organizationId));
 
-    const statusSnapshot = new Map<
-      number,
-      { id: string; status: string }
-    >();
+    const statusSnapshot = new Map<number, { id: string; status: string }>();
     for (const row of existingRows) {
       statusSnapshot.set(row.bluefolderId, {
         id: row.id,
@@ -132,7 +129,10 @@ export class ServiceRequestsService {
           updatedAt: sql`excluded.updated_at`,
         },
       })
-      .returning({ id: serviceRequests.id, bluefolderId: serviceRequests.bluefolderId });
+      .returning({
+        id: serviceRequests.id,
+        bluefolderId: serviceRequests.bluefolderId,
+      });
 
     // Build a map of bluefolderId -> internal UUID from upsert results
     const upsertedMap = new Map<number, string>();
