@@ -14,6 +14,8 @@ import type {
   BfServiceRequestListResponse,
   BfServiceRequestGetResponse,
   BfServiceRequestFilesResponse,
+  BfServiceRequestHistoryResponse,
+  BfServiceRequestHistoryEntry,
   BfServiceRequestListFilter,
 } from './types/bluefolder-api.types';
 import type {
@@ -122,6 +124,30 @@ export class BlueFolderService {
       }
       throw error;
     }
+  }
+
+  async getServiceRequestHistory(
+    clerkOrgId: string,
+    serviceRequestId: number,
+  ): Promise<BfServiceRequestHistoryEntry[]> {
+    const apiKey = await this.getApiKey(clerkOrgId);
+    return this.getServiceRequestHistoryWithKey(apiKey, serviceRequestId);
+  }
+
+  async getServiceRequestHistoryWithKey(
+    apiKey: string,
+    serviceRequestId: number,
+  ): Promise<BfServiceRequestHistoryEntry[]> {
+    const result =
+      await this.client.request<BfServiceRequestHistoryResponse>(
+        'serviceRequests/getHistory.aspx',
+        apiKey,
+        { serviceRequestId: String(serviceRequestId) },
+      );
+
+    return (
+      result.serviceRequestHistoryList?.serviceRequestHistory ?? []
+    );
   }
 
   private collectSummaryUserIds(summaries: ServiceRequestSummary[]): number[] {

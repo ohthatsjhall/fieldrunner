@@ -24,7 +24,8 @@
     "db:generate": "bunx --bun drizzle-kit generate",
     "db:migrate": "bunx --bun drizzle-kit migrate",
     "db:reset": "bun run scripts/db-reset.ts",
-    "db:seed-api-key": "bun run scripts/seed-api-key.ts"
+    "db:seed-api-key": "bun run scripts/seed-api-key.ts",
+    "db:backfill-events": "bun run scripts/backfill-sr-events.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

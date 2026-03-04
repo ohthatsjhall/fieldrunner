@@ -13,6 +13,7 @@ export type {
   RolePermission,
   OrganizationSettings,
   ServiceRequest,
+  ServiceRequestEvent,
   ServiceRequestStats,
   BlueFolderUser,
   TradeCategory,

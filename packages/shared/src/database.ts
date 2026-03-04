@@ -9,9 +9,11 @@ export type ServiceRequestStatus =
   | 'New'
   | 'Proposed'
   | 'Assigned'
+  | 'Vendor Assigned'
   | 'In Progress'
   | 'Job Costing'
   | 'Work Complete'
+  | 'Customer Invoiced'
   | 'Waiting On Invoice'
   | 'WO Needs Fix'
   | 'Cancelled'
@@ -167,6 +169,19 @@ export type ServiceRequest = {
   syncedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ServiceRequestEvent = {
+  id: string;
+  organizationId: string;
+  serviceRequestId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  occurredAt: Date;
+  durationInStatusMs: number | null;
+  source: string | null;
+  bluefolderHistoryId: number | null;
+  createdAt: Date;
 };
 
 export type ServiceRequestStats = {
