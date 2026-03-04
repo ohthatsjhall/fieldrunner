@@ -67,9 +67,7 @@ export class SearchQueryGeneratorService {
   }
 
   private buildPrompt(sr: ServiceRequestDetail): string {
-    const workParts: string[] = [
-      `Description: ${sr.description}`,
-    ];
+    const workParts: string[] = [`Description: ${sr.description}`];
 
     if (sr.detailedDescription) {
       workParts.push(`Detailed Description: ${sr.detailedDescription}`);

@@ -138,16 +138,13 @@ export class BlueFolderService {
     apiKey: string,
     serviceRequestId: number,
   ): Promise<BfServiceRequestHistoryEntry[]> {
-    const result =
-      await this.client.request<BfServiceRequestHistoryResponse>(
-        'serviceRequests/getHistory.aspx',
-        apiKey,
-        { serviceRequestId: String(serviceRequestId) },
-      );
-
-    return (
-      result.serviceRequestHistoryList?.serviceRequestHistory ?? []
+    const result = await this.client.request<BfServiceRequestHistoryResponse>(
+      'serviceRequests/getHistory.aspx',
+      apiKey,
+      { serviceRequestId: String(serviceRequestId) },
     );
+
+    return result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
   }
 
   private collectSummaryUserIds(summaries: ServiceRequestSummary[]): number[] {
