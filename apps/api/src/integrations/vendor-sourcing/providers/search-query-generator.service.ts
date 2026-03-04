@@ -18,6 +18,8 @@ Rules:
 - Return 2-3 queries ordered from most specific to broadest
 - Also return the best-fit trade category for organizing this vendor
 - Strip urgency/priority language from queries. Words like 'emergency', 'urgent', 'critical', 'immediate', 'ASAP', '24-hour', 'same-day' bias Google Places results toward expensive emergency services rather than the best-fit contractor for the actual trade work.
+- CRITICAL: The customer name and location name describe the CLIENT'S business — where the work is performed. They do NOT describe the type of contractor needed. Never include the customer's business type in search queries. Google Places interprets every word literally, so including the client's industry will return businesses in that industry instead of the contractors who service them.
+- Your queries must ONLY contain words describing the trade, skill, or contractor type needed to perform the work. Derive this from the description, detailed description, category, and equipment fields — not the customer name.
 
 Respond with ONLY valid JSON in this exact format:
 {
@@ -65,36 +67,43 @@ export class SearchQueryGeneratorService {
   }
 
   private buildPrompt(sr: ServiceRequestDetail): string {
-    const parts: string[] = [
-      `Service Request #${sr.serviceRequestId}`,
-      `Description: ${sr.description}`,
-    ];
+    const workParts: string[] = [`Description: ${sr.description}`];
 
     if (sr.detailedDescription) {
-      parts.push(`Detailed Description: ${sr.detailedDescription}`);
+      workParts.push(`Detailed Description: ${sr.detailedDescription}`);
     }
-
-    parts.push(`Type: ${sr.type}`);
-    parts.push(`Priority: ${sr.priority}`);
 
     const category = sr.customFields.find((f) => f.name === 'Category');
     if (category?.value) {
-      parts.push(`Category: ${category.value}`);
+      workParts.push(`Category: ${category.value}`);
     }
+
+    workParts.push(`Type: ${sr.type}`);
+    workParts.push(`Priority: ${sr.priority}`);
 
     if (sr.equipment.length > 0) {
       const equipNames = sr.equipment
-        .map((e) => [e.equipName, e.equipType, e.mfrName].filter(Boolean).join(' '))
+        .map((e) =>
+          [e.equipName, e.equipType, e.mfrName].filter(Boolean).join(' '),
+        )
         .join(', ');
-      parts.push(`Equipment: ${equipNames}`);
+      workParts.push(`Equipment: ${equipNames}`);
     }
 
-    parts.push(`Customer: ${sr.customerName}`);
-    parts.push(
+    const contextParts: string[] = [
+      `Customer: ${sr.customerName}`,
       `Location: ${sr.customerLocationCity}, ${sr.customerLocationState}`,
-    );
+    ];
 
-    return parts.join('\n');
+    return [
+      `Service Request #${sr.serviceRequestId}`,
+      '',
+      '=== WORK NEEDED (use this to determine the contractor type) ===',
+      ...workParts,
+      '',
+      '=== CLIENT CONTEXT (do NOT include in search queries) ===',
+      ...contextParts,
+    ].join('\n');
   }
 
   private parseResponse(
@@ -103,7 +112,10 @@ export class SearchQueryGeneratorService {
   ): GeneratedSearchQueries {
     try {
       // Strip markdown code fences if present
-      const cleaned = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+      const cleaned = text
+        .replace(/```json?\n?/g, '')
+        .replace(/```/g, '')
+        .trim();
       const parsed = JSON.parse(cleaned);
 
       if (

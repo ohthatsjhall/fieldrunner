@@ -48,9 +48,7 @@ describe('normalizeEmail', () => {
   });
 
   it('should accept emails with plus addressing', () => {
-    expect(normalizeEmail('user+tag@example.com')).toBe(
-      'user+tag@example.com',
-    );
+    expect(normalizeEmail('user+tag@example.com')).toBe('user+tag@example.com');
   });
 
   it('should accept emails with hyphens and dots in local part', () => {

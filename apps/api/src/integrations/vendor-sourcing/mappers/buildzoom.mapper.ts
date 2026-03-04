@@ -21,7 +21,7 @@ export function mapBuildZoomContractor(
     latitude: null,
     longitude: null,
     website: null,
-    email: normalizeEmail(contractor.email as string | null | undefined),
+    email: normalizeEmail(contractor.email),
     rating: null,
     reviewCount: contractor.reviewsCount ?? null,
     types: contractor.servicesOffered ?? [],
@@ -30,9 +30,10 @@ export function mapBuildZoomContractor(
   };
 }
 
-export function parseLocation(
-  location: string | null | undefined,
-): { city: string | null; state: string | null } {
+export function parseLocation(location: string | null | undefined): {
+  city: string | null;
+  state: string | null;
+} {
   if (!location) return { city: null, state: null };
   const parts = location.split(',').map((s) => s.trim());
   return {

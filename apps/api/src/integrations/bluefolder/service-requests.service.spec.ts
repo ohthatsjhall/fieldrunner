@@ -99,7 +99,10 @@ describe('ServiceRequestsService', () => {
       innerJoin: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
-      onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+      onConflictDoUpdate: jest.fn().mockReturnThis(),
+      onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      returning: jest.fn().mockResolvedValue([]),
+      [Symbol.iterator]: function* () {},
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -192,16 +195,19 @@ describe('ServiceRequestsService', () => {
         accountManagerName: null,
         expected: null,
       },
-    ])('should map assigneeName correctly when $label', async ({ serviceManagerName, accountManagerName, expected }) => {
-      mockBlueFolderService.listServiceRequests.mockResolvedValue([
-        makeSummary({ serviceManagerName, accountManagerName }),
-      ]);
+    ])(
+      'should map assigneeName correctly when $label',
+      async ({ serviceManagerName, accountManagerName, expected }) => {
+        mockBlueFolderService.listServiceRequests.mockResolvedValue([
+          makeSummary({ serviceManagerName, accountManagerName }),
+        ]);
 
-      await service.sync(clerkOrgId);
+        await service.sync(clerkOrgId);
 
-      const upsertedRows = mockDb.values.mock.calls[0][0];
-      expect(upsertedRows[0].assigneeName).toBe(expected);
-    });
+        const upsertedRows = mockDb.values.mock.calls[0][0];
+        expect(upsertedRows[0].assigneeName).toBe(expected);
+      },
+    );
 
     it('should emit sync.completed event with clerkOrgId and organizationId', async () => {
       mockBlueFolderService.listServiceRequests.mockResolvedValue([
@@ -275,7 +281,12 @@ describe('ServiceRequestsService', () => {
 
       const stats = await service.getStats(clerkOrgId);
 
-      expect(stats).toEqual({ newCount: 0, inProgress: 0, assigned: 0, open: 0 });
+      expect(stats).toEqual({
+        newCount: 0,
+        inProgress: 0,
+        assigned: 0,
+        open: 0,
+      });
     });
   });
 
@@ -295,6 +306,194 @@ describe('ServiceRequestsService', () => {
       const result = await service.getLastSyncedAt(clerkOrgId);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('sync status change detection', () => {
+    it('should not insert events when status is unchanged', async () => {
+      // Existing SR in DB with status 'New'
+      mockDb.where.mockResolvedValueOnce([
+        { bluefolderId: 1001, id: 'sr-uuid-1', status: 'New' },
+      ]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 1001, status: 'New' }),
+      ]);
+
+      await service.sync(clerkOrgId);
+
+      // insert is called once for the SR upsert, but no event insert
+      const insertCalls = mockDb.insert.mock.calls;
+      expect(insertCalls.length).toBe(1);
+    });
+
+    it('should insert event with correct fromStatus/toStatus when status changes', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { bluefolderId: 1001, id: 'sr-uuid-1', status: 'New' },
+      ]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 1001, status: 'Assigned' }),
+      ]);
+
+      const insertedValues: any[] = [];
+      mockDb.insert.mockImplementation(() => ({
+        values: (vals: any) => {
+          insertedValues.push(vals);
+          return {
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
+            }),
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          };
+        },
+      }));
+
+      await service.sync(clerkOrgId);
+
+      expect(insertedValues.length).toBe(2);
+      const eventRows = insertedValues[1];
+      expect(eventRows).toHaveLength(1);
+      expect(eventRows[0]).toMatchObject({
+        organizationId: internalOrgId,
+        serviceRequestId: 'sr-uuid-1',
+        fromStatus: 'New',
+        toStatus: 'Assigned',
+        source: 'bluefolder',
+      });
+    });
+
+    it('should handle multiple status changes in a single sync batch', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { bluefolderId: 1001, id: 'sr-uuid-1', status: 'New' },
+        { bluefolderId: 1002, id: 'sr-uuid-2', status: 'Assigned' },
+      ]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 1001, status: 'In Progress' }),
+        makeSummary({
+          serviceRequestId: 1002,
+          status: 'Closed',
+          isOpen: false,
+        }),
+      ]);
+
+      const insertedValues: any[] = [];
+      mockDb.insert.mockImplementation(() => ({
+        values: (vals: any) => {
+          insertedValues.push(vals);
+          return {
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
+            }),
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          };
+        },
+      }));
+
+      await service.sync(clerkOrgId);
+
+      const eventRows = insertedValues[1];
+      expect(eventRows).toHaveLength(2);
+      expect(eventRows[0]).toMatchObject({
+        fromStatus: 'New',
+        toStatus: 'In Progress',
+      });
+      expect(eventRows[1]).toMatchObject({
+        fromStatus: 'Assigned',
+        toStatus: 'Closed',
+      });
+    });
+
+    it('should create creation event with fromStatus null for new SRs', async () => {
+      mockDb.where.mockResolvedValueOnce([]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 9999, status: 'New' }),
+      ]);
+
+      const insertedValues: any[] = [];
+      mockDb.insert.mockImplementation(() => ({
+        values: (vals: any) => {
+          insertedValues.push(vals);
+          return {
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest
+                .fn()
+                .mockResolvedValue([{ id: 'new-sr-uuid', bluefolderId: 9999 }]),
+            }),
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          };
+        },
+      }));
+
+      await service.sync(clerkOrgId);
+
+      const eventRows = insertedValues[1];
+      expect(eventRows).toHaveLength(1);
+      expect(eventRows[0]).toMatchObject({
+        fromStatus: null,
+        toStatus: 'New',
+        source: 'bluefolder',
+      });
+    });
+
+    it('should set source to bluefolder on all sync events', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { bluefolderId: 1001, id: 'sr-uuid-1', status: 'New' },
+      ]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 1001, status: 'Assigned' }),
+      ]);
+
+      const insertedValues: any[] = [];
+      mockDb.insert.mockImplementation(() => ({
+        values: (vals: any) => {
+          insertedValues.push(vals);
+          return {
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
+            }),
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          };
+        },
+      }));
+
+      await service.sync(clerkOrgId);
+
+      const eventRows = insertedValues[1];
+      for (const row of eventRows) {
+        expect(row.source).toBe('bluefolder');
+      }
+    });
+
+    it('should use syncedAt as occurredAt timestamp', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { bluefolderId: 1001, id: 'sr-uuid-1', status: 'New' },
+      ]);
+
+      mockBlueFolderService.listServiceRequests.mockResolvedValue([
+        makeSummary({ serviceRequestId: 1001, status: 'Assigned' }),
+      ]);
+
+      const insertedValues: any[] = [];
+      mockDb.insert.mockImplementation(() => ({
+        values: (vals: any) => {
+          insertedValues.push(vals);
+          return {
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
+            }),
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          };
+        },
+      }));
+
+      const result = await service.sync(clerkOrgId);
+
+      const eventRows = insertedValues[1];
+      expect(eventRows[0].occurredAt).toEqual(result.syncedAt);
     });
   });
 
@@ -318,9 +517,9 @@ describe('ServiceRequestsService', () => {
 
       expect(mockSettings.resolveOrgId).toHaveBeenCalledWith('org_aaa');
       expect(mockSettings.resolveOrgId).toHaveBeenCalledWith('org_bbb');
-      expect(
-        mockBlueFolderService.listServiceRequests,
-      ).toHaveBeenCalledTimes(2);
+      expect(mockBlueFolderService.listServiceRequests).toHaveBeenCalledTimes(
+        2,
+      );
     });
 
     it('should stagger 3s between orgs but not after the last', async () => {
@@ -356,9 +555,9 @@ describe('ServiceRequestsService', () => {
 
       await service.syncAll();
 
-      expect(
-        mockBlueFolderService.listServiceRequests,
-      ).toHaveBeenCalledTimes(2);
+      expect(mockBlueFolderService.listServiceRequests).toHaveBeenCalledTimes(
+        2,
+      );
     });
   });
 });

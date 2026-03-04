@@ -110,8 +110,7 @@ describe('VendorScoringService', () => {
       ];
       const scores = levels.map(
         (level) =>
-          service.score(makeInput({ categoryMatch: level }))
-            .categoryMatchScore,
+          service.score(makeInput({ categoryMatch: level })).categoryMatchScore,
       );
       expect(scores[0]).toBeGreaterThan(scores[1]);
       expect(scores[1]).toBeGreaterThan(scores[2]);
@@ -191,9 +190,7 @@ describe('VendorScoringService', () => {
     });
 
     it('should score bzScore on 0-200 scale', () => {
-      const low = service.calcCredentialScore(
-        makeCredentials({ bzScore: 50 }),
-      );
+      const low = service.calcCredentialScore(makeCredentials({ bzScore: 50 }));
       const high = service.calcCredentialScore(
         makeCredentials({ bzScore: 150 }),
       );
@@ -224,47 +221,51 @@ describe('VendorScoringService', () => {
 
     it('should cap at 100', () => {
       const maxed = service.calcCredentialScore({
-        hasActiveLicense: true,   // 40
-        licenseCount: 5,          // 15
-        bzScore: 200,             // 20
-        isInsured: true,          // 10
-        recentPermitCount: 50,    // ~15
+        hasActiveLicense: true, // 40
+        licenseCount: 5, // 15
+        bzScore: 200, // 20
+        isInsured: true, // 10
+        recentPermitCount: 50, // ~15
         permitCount: 300,
       });
       expect(maxed).toBeLessThanOrEqual(100);
     });
 
     it('should weight credential at 0.20 in total score', () => {
-      expect(DEFAULT_WEIGHTS.credential).toBe(0.20);
+      expect(DEFAULT_WEIGHTS.credential).toBe(0.2);
     });
 
     it('BZ vendor with strong credentials should outscore Google vendor with no credentials (comparable distance)', () => {
       // Google vendor: good rating, no credentials
-      const googleVendor = service.score(makeInput({
-        distanceMeters: 3200,
-        rating: 4.8,
-        reviewCount: 13,
-        categoryMatch: 'exact',
-        businessHoursStatus: 'open',
-        credentialSignals: EMPTY_CREDENTIALS,
-      }));
+      const googleVendor = service.score(
+        makeInput({
+          distanceMeters: 3200,
+          rating: 4.8,
+          reviewCount: 13,
+          categoryMatch: 'exact',
+          businessHoursStatus: 'open',
+          credentialSignals: EMPTY_CREDENTIALS,
+        }),
+      );
 
       // BZ vendor: no rating, strong credentials
-      const bzVendor = service.score(makeInput({
-        distanceMeters: 5800,
-        rating: null,
-        reviewCount: 3,
-        categoryMatch: 'exact',
-        businessHoursStatus: 'unknown',
-        credentialSignals: {
-          hasActiveLicense: true,
-          licenseCount: 2,
-          bzScore: 142,
-          isInsured: true,
-          permitCount: 85,
-          recentPermitCount: 22,
-        },
-      }));
+      const bzVendor = service.score(
+        makeInput({
+          distanceMeters: 5800,
+          rating: null,
+          reviewCount: 3,
+          categoryMatch: 'exact',
+          businessHoursStatus: 'unknown',
+          credentialSignals: {
+            hasActiveLicense: true,
+            licenseCount: 2,
+            bzScore: 142,
+            isInsured: true,
+            permitCount: 85,
+            recentPermitCount: 22,
+          },
+        }),
+      );
 
       expect(bzVendor.totalScore).toBeGreaterThan(googleVendor.totalScore);
       expect(bzVendor.credentialScore).toBeGreaterThan(70);

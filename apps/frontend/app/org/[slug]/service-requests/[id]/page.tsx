@@ -16,7 +16,6 @@ import { SrOverview } from './components/sr-overview';
 import { SrFilesTab } from './components/sr-files-tab';
 import { SrHistoryTab } from './components/sr-history-tab';
 import { SrVendors } from './components/sr-vendors';
-import { SrQuickActions } from './components/sr-quick-actions';
 
 export default function ServiceRequestDetailPage() {
   const params = useParams<{ slug: string; id: string }>();
@@ -63,7 +62,6 @@ export default function ServiceRequestDetailPage() {
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
-          <SrQuickActions sr={sr} />
         </div>
 
         <TabsContent value="overview">
@@ -72,6 +70,7 @@ export default function ServiceRequestDetailPage() {
             vendors={
               sr.status.toLowerCase() === 'assigned' ? (
                 <SrVendors
+                  sr={sr}
                   results={vendorResults ?? null}
                   resultsLoading={resultsLoading}
                   onReSearch={() =>

@@ -5,7 +5,10 @@ import { BlueFolderService } from './bluefolder.service';
 import { BlueFolderClientService } from './bluefolder-client.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
-import type { BfServiceRequestListItem } from './types/bluefolder-api.types';
+import type {
+  BfServiceRequestListItem,
+  BfServiceRequestHistoryEntry,
+} from './types/bluefolder-api.types';
 
 function makeBfListItem(
   overrides: Partial<BfServiceRequestListItem> = {},
@@ -397,6 +400,90 @@ describe('BlueFolderService', () => {
       expect(result.accountManagerName).toBeNull();
       expect(result.serviceManagerName).toBeNull();
       expect(result.createdByUserName).toBeNull();
+    });
+  });
+
+  describe('getServiceRequestHistory', () => {
+    it('should throw BadRequestException when no API key configured', async () => {
+      mockSettings.getDecryptedApiKey.mockResolvedValue(null);
+
+      await expect(
+        service.getServiceRequestHistory(clerkOrgId, 1001),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return history entries from API', async () => {
+      mockSettings.getDecryptedApiKey.mockResolvedValue('api-key');
+      const entries: BfServiceRequestHistoryEntry[] = [
+        {
+          id: '1',
+          serviceRequestId: '1001',
+          entryType: 'Status Changed',
+          entryDate: '2024-01-15T10:00:00Z',
+          description: 'Status changed from [New] to [Assigned].',
+        },
+      ];
+      mockClient.request.mockResolvedValue({
+        serviceRequestHistoryList: { serviceRequestHistory: entries },
+      });
+
+      const result = await service.getServiceRequestHistory(clerkOrgId, 1001);
+
+      expect(result).toEqual(entries);
+      expect(mockClient.request).toHaveBeenCalledWith(
+        'serviceRequests/getHistory.aspx',
+        'api-key',
+        { serviceRequestId: '1001' },
+      );
+    });
+
+    it('should return empty array when no history entries exist', async () => {
+      mockSettings.getDecryptedApiKey.mockResolvedValue('api-key');
+      mockClient.request.mockResolvedValue({});
+
+      const result = await service.getServiceRequestHistory(clerkOrgId, 1001);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getServiceRequestHistoryWithKey', () => {
+    it('should call client with provided API key directly', async () => {
+      const entries: BfServiceRequestHistoryEntry[] = [
+        {
+          id: '2',
+          serviceRequestId: '1001',
+          entryType: 'Created',
+          entryDate: '2024-01-01T00:00:00Z',
+          description: 'Service request created.',
+        },
+      ];
+      mockClient.request.mockResolvedValue({
+        serviceRequestHistoryList: { serviceRequestHistory: entries },
+      });
+
+      const result = await service.getServiceRequestHistoryWithKey(
+        'direct-key',
+        1001,
+      );
+
+      expect(result).toEqual(entries);
+      expect(mockClient.request).toHaveBeenCalledWith(
+        'serviceRequests/getHistory.aspx',
+        'direct-key',
+        { serviceRequestId: '1001' },
+      );
+    });
+
+    it('should return empty array when serviceRequestHistoryList is missing', async () => {
+      mockClient.request.mockResolvedValue({});
+
+      const result = await service.getServiceRequestHistoryWithKey(
+        'api-key',
+        1001,
+      );
+
+      expect(result).toEqual([]);
     });
   });
 });

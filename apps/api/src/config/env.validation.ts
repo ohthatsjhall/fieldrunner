@@ -13,12 +13,7 @@ export const envSchema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
 
-  PORT: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(65535)
-    .default(3001),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3001),
 
   CORS_ORIGINS: z.string().optional(),
 
@@ -87,9 +82,7 @@ export function validate(config: Record<string, unknown>): Env {
 
   if (!result.success) {
     const formatted = z.prettifyError(result.error);
-    throw new Error(
-      `\n\nEnvironment validation failed:\n${formatted}\n`,
-    );
+    throw new Error(`\n\nEnvironment validation failed:\n${formatted}\n`);
   }
 
   return result.data;

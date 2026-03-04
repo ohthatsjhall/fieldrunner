@@ -7,6 +7,7 @@ import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import type { Database } from '../../core/database';
 import {
   serviceRequests,
+  serviceRequestEvents,
   organizations,
   organizationSettings,
 } from '../../core/database/schema';
@@ -31,7 +32,10 @@ const MAX_CACHE_SIZE = 50;
 @Injectable()
 export class ServiceRequestsService {
   private readonly logger = new Logger(ServiceRequestsService.name);
-  private readonly findAllCache = new Map<string, CacheEntry<(typeof serviceRequests.$inferSelect)[]>>();
+  private readonly findAllCache = new Map<
+    string,
+    CacheEntry<(typeof serviceRequests.$inferSelect)[]>
+  >();
 
   constructor(
     @Inject(DATABASE_CONNECTION)
@@ -62,6 +66,24 @@ export class ServiceRequestsService {
       return { total: 0, syncedAt };
     }
 
+    // Snapshot existing SR statuses for change detection
+    const existingRows = await this.db
+      .select({
+        bluefolderId: serviceRequests.bluefolderId,
+        id: serviceRequests.id,
+        status: serviceRequests.status,
+      })
+      .from(serviceRequests)
+      .where(eq(serviceRequests.organizationId, organizationId));
+
+    const statusSnapshot = new Map<number, { id: string; status: string }>();
+    for (const row of existingRows) {
+      statusSnapshot.set(row.bluefolderId, {
+        id: row.id,
+        status: row.status,
+      });
+    }
+
     const rows = items.map((sr) => ({
       organizationId,
       bluefolderId: sr.serviceRequestId,
@@ -77,17 +99,13 @@ export class ServiceRequestsService {
       isOverdue: sr.isOverdue,
       billableTotal: String(sr.billableTotal),
       costTotal: String(sr.costTotal),
-      dateTimeCreated: sr.dateTimeCreated
-        ? new Date(sr.dateTimeCreated)
-        : null,
-      dateTimeClosed: sr.dateTimeClosed
-        ? new Date(sr.dateTimeClosed)
-        : null,
+      dateTimeCreated: sr.dateTimeCreated ? new Date(sr.dateTimeCreated) : null,
+      dateTimeClosed: sr.dateTimeClosed ? new Date(sr.dateTimeClosed) : null,
       syncedAt,
       updatedAt: syncedAt,
     }));
 
-    await this.db
+    const upsertedRows = await this.db
       .insert(serviceRequests)
       .values(rows)
       .onConflictDoUpdate({
@@ -110,7 +128,56 @@ export class ServiceRequestsService {
           syncedAt: sql`excluded.synced_at`,
           updatedAt: sql`excluded.updated_at`,
         },
+      })
+      .returning({
+        id: serviceRequests.id,
+        bluefolderId: serviceRequests.bluefolderId,
       });
+
+    // Build a map of bluefolderId -> internal UUID from upsert results
+    const upsertedMap = new Map<number, string>();
+    for (const row of upsertedRows) {
+      upsertedMap.set(row.bluefolderId, row.id);
+    }
+
+    // Detect status changes and build event rows
+    const eventRows: (typeof serviceRequestEvents.$inferInsert)[] = [];
+    for (const item of items) {
+      const existing = statusSnapshot.get(item.serviceRequestId);
+      const serviceRequestId =
+        existing?.id ?? upsertedMap.get(item.serviceRequestId);
+
+      if (!serviceRequestId) continue;
+
+      if (!existing) {
+        // New SR — creation event
+        eventRows.push({
+          organizationId,
+          serviceRequestId,
+          fromStatus: null,
+          toStatus: item.status,
+          occurredAt: syncedAt,
+          source: 'bluefolder',
+        });
+      } else if (existing.status !== item.status) {
+        // Status changed
+        eventRows.push({
+          organizationId,
+          serviceRequestId,
+          fromStatus: existing.status,
+          toStatus: item.status,
+          occurredAt: syncedAt,
+          source: 'bluefolder',
+        });
+      }
+    }
+
+    if (eventRows.length > 0) {
+      await this.db
+        .insert(serviceRequestEvents)
+        .values(eventRows)
+        .onConflictDoNothing();
+    }
 
     this.findAllCache.delete(clerkOrgId);
 

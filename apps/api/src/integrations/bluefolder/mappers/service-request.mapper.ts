@@ -39,7 +39,9 @@ function toDateOrNull(value: string | undefined | null): string | null {
 function decodeXmlText(value: string | undefined | null): string {
   if (!value) return '';
   return value
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
     .replace(/\r\n?/g, '\n');
 }

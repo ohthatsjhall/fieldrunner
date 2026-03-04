@@ -1,8 +1,16 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TableProperties, Columns3 } from 'lucide-react';
+import { TableProperties, Columns3, CalendarDays, ChevronDown } from 'lucide-react';
+import { usePersistedState } from '@/lib/use-persisted-state';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@/app/components/ui/dropdown-menu';
 import type { ServiceRequestStats } from '@fieldrunner/shared';
 import { cn } from '@/lib/utils';
 import {
@@ -65,32 +73,51 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
   const lastSyncedAt = syncData?.lastSyncedAt ?? null;
 
   const [hideClosed, setHideClosed] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>(() => {
-    if (typeof window === 'undefined') return 'table';
-    try {
-      const saved = localStorage.getItem('sr-view-mode');
-      return saved === 'kanban' ? 'kanban' : 'table';
-    } catch {
-      return 'table';
-    }
-  });
 
-  const handleViewMode = useCallback((mode: 'table' | 'kanban') => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('sr-view-mode', mode);
-    } catch {
-      // localStorage unavailable — ignore
-    }
-  }, []);
+  const DAYS_FILTER_LABELS: Record<string, string> = {
+    '7': 'Last 7 days',
+    '14': 'Last 14 days',
+    '30': 'Last 30 days',
+  };
 
-  const visibleRequests = useMemo(
-    () =>
-      hideClosed
-        ? serviceRequests.filter((sr) => sr.status?.toLowerCase() !== 'closed')
-        : serviceRequests,
-    [serviceRequests, hideClosed],
+  const [daysFilter, setDaysFilter] = usePersistedState<number | null>(
+    'sr-days-filter',
+    null,
+    (v) => (typeof v === 'number' && [7, 14, 30].includes(v) ? v : undefined),
   );
+
+  const handleDaysFilter = (value: string) => {
+    setDaysFilter(value === 'all' ? null : Number(value));
+  };
+
+  const daysFilterLabel = daysFilter !== null
+    ? (DAYS_FILTER_LABELS[String(daysFilter)] ?? 'All time')
+    : 'All time';
+
+  const [viewMode, setViewMode] = usePersistedState<'table' | 'kanban'>(
+    'sr-view-mode',
+    'table',
+    (v) => (v === 'kanban' ? 'kanban' : v === 'table' ? 'table' : undefined),
+  );
+
+  const visibleRequests = useMemo(() => {
+    let filtered = serviceRequests;
+
+    if (daysFilter !== null) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysFilter);
+      filtered = filtered.filter((sr) => {
+        if (!sr.dateTimeCreated) return true;
+        return new Date(sr.dateTimeCreated) >= cutoff;
+      });
+    }
+
+    if (hideClosed) {
+      filtered = filtered.filter((sr) => sr.status?.toLowerCase() !== 'closed');
+    }
+
+    return filtered;
+  }, [serviceRequests, hideClosed, daysFilter]);
 
   const columns = useServiceRequestColumns(visibleRequests);
 
@@ -168,7 +195,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
           <div className="flex items-center justify-between">
             <div className="inline-flex overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
               <button
-                onClick={() => handleViewMode('table')}
+                onClick={() => setViewMode('table')}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors',
                   viewMode === 'table'
@@ -180,7 +207,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
                 Table
               </button>
               <button
-                onClick={() => handleViewMode('kanban')}
+                onClick={() => setViewMode('kanban')}
                 className={cn(
                   'inline-flex items-center gap-1.5 border-l border-zinc-200 px-3 py-1.5 text-sm font-medium transition-colors dark:border-zinc-800',
                   viewMode === 'kanban'
@@ -193,6 +220,23 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
               </button>
             </div>
             <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900">
+                    <CalendarDays className="size-4" />
+                    {daysFilterLabel}
+                    <ChevronDown className="size-3.5 opacity-50" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={daysFilter === null ? 'all' : String(daysFilter)} onValueChange={handleDaysFilter}>
+                    <DropdownMenuRadioItem value="7">Last 7 days</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="14">Last 14 days</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="30">Last 30 days</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="all">All time</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-zinc-200 p-0.5 inset-ring inset-ring-zinc-900/5 outline-offset-2 outline-primary transition-colors duration-200 ease-in-out has-checked:bg-primary has-focus-visible:outline-2 dark:bg-zinc-700 dark:inset-ring-white/5 dark:has-checked:bg-primary">
                 <span className="size-5 rounded-full bg-white shadow-xs ring-1 ring-zinc-900/5 transition-transform duration-200 ease-in-out group-has-checked:translate-x-5 dark:ring-white/10" />
                 <input

@@ -70,7 +70,9 @@ function makeSrDetail(
   };
 }
 
-function makeGooglePlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace {
+function makeGooglePlace(
+  overrides: Partial<NormalizedPlace> = {},
+): NormalizedPlace {
   return {
     sourceId: 'ChIJ_test1',
     source: 'google_places',
@@ -95,7 +97,9 @@ function makeGooglePlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPl
   };
 }
 
-function makeBzPlace(overrides: Partial<NormalizedPlace> = {}): NormalizedPlace {
+function makeBzPlace(
+  overrides: Partial<NormalizedPlace> = {},
+): NormalizedPlace {
   return {
     sourceId: 'https://www.buildzoom.com/contractor/bz-plumbing',
     source: 'buildzoom',
@@ -202,14 +206,16 @@ describe('VendorSourcingService', () => {
       name: 'buildzoom',
       isEnabled: true,
       search: jest.fn().mockResolvedValue([makeBzPlace()]),
-      discoverProfileUrls: jest.fn().mockResolvedValue([
-        'https://www.buildzoom.com/contractor/bz-plumbing',
-        'https://www.buildzoom.com/contractor/bz-plumbing-2',
-        'https://www.buildzoom.com/contractor/bz-plumbing-3',
-        'https://www.buildzoom.com/contractor/bz-plumbing-4',
-        'https://www.buildzoom.com/contractor/bz-plumbing-5',
-        'https://www.buildzoom.com/contractor/bz-plumbing-6',
-      ]),
+      discoverProfileUrls: jest
+        .fn()
+        .mockResolvedValue([
+          'https://www.buildzoom.com/contractor/bz-plumbing',
+          'https://www.buildzoom.com/contractor/bz-plumbing-2',
+          'https://www.buildzoom.com/contractor/bz-plumbing-3',
+          'https://www.buildzoom.com/contractor/bz-plumbing-4',
+          'https://www.buildzoom.com/contractor/bz-plumbing-5',
+          'https://www.buildzoom.com/contractor/bz-plumbing-6',
+        ]),
       scrapeProfiles: jest.fn().mockResolvedValue([makeBzPlace()]),
     } as unknown as jest.Mocked<BuildZoomProvider>;
 
@@ -378,9 +384,7 @@ describe('VendorSourcingService', () => {
 
       // First call: address geocoding, Second+: BZ result geocoding
       const geocodeCalls = mockNominatim.geocode.mock.calls;
-      const bzGeocode = geocodeCalls.find((c) =>
-        c[0]?.includes('300 Elm St'),
-      );
+      const bzGeocode = geocodeCalls.find((c) => c[0]?.includes('300 Elm St'));
       expect(bzGeocode).toBeDefined();
     });
 
@@ -402,7 +406,9 @@ describe('VendorSourcingService', () => {
     });
 
     it('should continue with Google-only when BuildZoom fails', async () => {
-      mockBuildZoom.discoverProfileUrls.mockRejectedValue(new Error('BZ timeout'));
+      mockBuildZoom.discoverProfileUrls.mockRejectedValue(
+        new Error('BZ timeout'),
+      );
 
       const result = await service.search(clerkOrgId, {
         serviceRequestBluefolderId: 2270,
@@ -686,5 +692,4 @@ describe('VendorSourcingService', () => {
       expect(result!.candidates).toEqual([]);
     });
   });
-
 });

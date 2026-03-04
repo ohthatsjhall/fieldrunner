@@ -107,9 +107,7 @@ describe('TradeCategoriesService', () => {
 
       const result = await service.resolveSearchQueries(orgId, 'plumbing');
 
-      expect(result).toEqual(
-        expect.objectContaining({ matchLevel: 'exact' }),
-      );
+      expect(result).toEqual(expect.objectContaining({ matchLevel: 'exact' }));
     });
 
     it('should fallback to fuzzy match when no exact match', async () => {
@@ -128,11 +126,12 @@ describe('TradeCategoriesService', () => {
         },
       ]);
 
-      const result = await service.resolveSearchQueries(orgId, 'Water Pipe Repair');
-
-      expect(result).toEqual(
-        expect.objectContaining({ matchLevel: 'fuzzy' }),
+      const result = await service.resolveSearchQueries(
+        orgId,
+        'Water Pipe Repair',
       );
+
+      expect(result).toEqual(expect.objectContaining({ matchLevel: 'fuzzy' }));
     });
 
     it('should fallback to generic query when nothing matches', async () => {

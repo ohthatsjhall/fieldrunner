@@ -1,5 +1,10 @@
 import { Controller, Get, Req } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CurrentUser, CurrentOrg } from '../core/auth/decorators';
 import type { AuthUser, AuthOrganization } from '@fieldrunner/shared';

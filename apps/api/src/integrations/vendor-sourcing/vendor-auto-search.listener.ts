@@ -29,7 +29,10 @@ export class VendorAutoSearchListener {
     try {
       // Find SRs with status 'Assigned' in this org
       const assignedSrs = await this.db
-        .select({ id: serviceRequests.id, bluefolderId: serviceRequests.bluefolderId })
+        .select({
+          id: serviceRequests.id,
+          bluefolderId: serviceRequests.bluefolderId,
+        })
         .from(serviceRequests)
         .where(
           and(
@@ -66,9 +69,7 @@ export class VendorAutoSearchListener {
             serviceRequestBluefolderId: sr.bluefolderId,
             initiatedBy: 'auto',
           });
-          this.logger.log(
-            `Auto-search completed for SR ${sr.bluefolderId}`,
-          );
+          this.logger.log(`Auto-search completed for SR ${sr.bluefolderId}`);
         } catch (err) {
           this.logger.error(
             `Auto-search failed for SR ${sr.bluefolderId}`,

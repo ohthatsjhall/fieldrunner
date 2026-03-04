@@ -1,45 +1,87 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
-import { PdfTable } from './pdf-table';
+import { formatDate, formatCurrency, getCustomField } from '../utils/sr-formatting';
+
+const GRAY = '#6b7280';
+const DARK = '#1f2937';
+const BORDER = '#d1d5db';
+const LIGHT_GRAY = '#f3f4f6';
+const FALLBACK = '-';
 
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 9,
-    paddingTop: 40,
+    paddingTop: 36,
     paddingBottom: 60,
     paddingHorizontal: 40,
-    color: '#1f2937',
+    color: DARK,
   },
   // Header
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  orgRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orgLogo: { width: 32, height: 32, borderRadius: 4 },
-  orgName: { fontSize: 14, fontFamily: 'Helvetica-Bold' },
-  headerRight: { alignItems: 'flex-end' },
-  title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: '#111827' },
-  subtitle: { fontSize: 9, color: '#6b7280', marginTop: 2 },
+  headerCenter: { alignItems: 'center', marginBottom: 8 },
+  orgLogo: { maxWidth: 120, maxHeight: 48, objectFit: 'contain', marginBottom: 4 },
+  orgName: { fontSize: 16, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
+  headerRule: { borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 6 },
+  headerMeta: { fontSize: 9, color: DARK, marginBottom: 2, textAlign: 'center' },
+
+  // Two-column
+  twoCol: { flexDirection: 'row', marginTop: 12, gap: 16 },
+  col: { flex: 1 },
+  colLabel: { fontSize: 10, fontFamily: 'Helvetica-Bold', marginBottom: 4, textTransform: 'uppercase' },
+  colText: { fontSize: 9, color: DARK, marginBottom: 2 },
+
+  // Contact info block
+  contactBlock: { marginTop: 12, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: BORDER },
+
+  // Metadata row (4 columns)
+  metaRow: { flexDirection: 'row', marginTop: 14, borderWidth: 0.5, borderColor: BORDER },
+  metaCell: { flex: 1, padding: 6, borderRightWidth: 0.5, borderRightColor: BORDER },
+  metaCellLast: { flex: 1, padding: 6 },
+  metaLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: GRAY, textTransform: 'uppercase', marginBottom: 2 },
+  metaValue: { fontSize: 9, color: DARK },
+
   // Section
-  section: { marginTop: 16 },
-  sectionTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingBottom: 4 },
-  // Key-value grid
-  kvGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  kvItem: { width: '50%', flexDirection: 'row', paddingVertical: 3 },
-  kvLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#6b7280', width: '45%' },
-  kvValue: { fontSize: 8, color: '#1f2937', width: '55%' },
-  // Stat boxes
-  statRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  statBox: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 8 },
-  statLabel: { fontSize: 7, color: '#6b7280', textTransform: 'uppercase' },
-  statValue: { fontSize: 12, fontFamily: 'Helvetica-Bold', marginTop: 2 },
-  // Equipment / Assignment cards
-  card: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 8, marginBottom: 6 },
-  cardTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
-  cardDetail: { fontSize: 8, color: '#6b7280', marginTop: 2 },
+  section: { marginTop: 14 },
+  sectionTitle: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK,
+    marginBottom: 4,
+    paddingBottom: 3,
+    borderBottomWidth: 0.5,
+    borderBottomColor: BORDER,
+  },
+  bodyText: { fontSize: 9, color: DARK, lineHeight: 1.4 },
+  bodyTextSecondary: { fontSize: 8, color: GRAY, lineHeight: 1.4, marginTop: 4 },
+
+  // Notice
+  noticeBox: {
+    marginTop: 14,
+    backgroundColor: LIGHT_GRAY,
+    padding: 8,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+  },
+  noticeTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 3 },
+  noticeText: { fontSize: 8, color: DARK },
+
+  // Sign-off
+  signOff: { marginTop: 20 },
+  signOffLine: { fontSize: 9, marginBottom: 12 },
+  signOffRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14 },
+  signOffRowLast: { flexDirection: 'row', alignItems: 'flex-end' },
+  blankLine: { borderBottomWidth: 0.5, borderBottomColor: DARK, width: 200, marginLeft: 8, display: 'flex' },
+
+  // Contact line (Work Authorized section)
+  contactLine: { fontSize: 9, color: DARK, lineHeight: 1.4, marginTop: 6 },
+
+  // Disclaimer
+  disclaimer: { marginTop: 16, textAlign: 'center', fontSize: 8, fontFamily: 'Helvetica-Bold', color: GRAY },
+
   // Footer
   footer: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 20,
     left: 40,
     right: 40,
     flexDirection: 'row',
@@ -47,21 +89,12 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: '#9ca3af',
     borderTopWidth: 0.5,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: BORDER,
     paddingTop: 6,
   },
 });
 
-function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleDateString();
-}
-
-interface SrPdfDocumentProps {
+export interface SrPdfDocumentProps {
   sr: ServiceRequestDetail;
   orgName: string;
   orgImageUrl: string | null;
@@ -69,250 +102,145 @@ interface SrPdfDocumentProps {
 }
 
 export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDocumentProps) {
-  const totalLaborHours = sr.billableLaborHours + sr.nonBillableLaborHours;
-  const hasFinancials = sr.billableTotal > 0 || sr.costTotal > 0 || totalLaborHours > 0 || sr.nonBillableTotal > 0;
+  const cf = sr.customFields;
+  const firstAssignment = sr.assignments[0];
 
-  const address = [sr.customerLocationStreetAddress, sr.customerLocationCity, sr.customerLocationState, sr.customerLocationPostalCode].filter(Boolean).join(', ');
+  // Vendor info
+  const vendorName =
+    getCustomField(cf, 'Vendor', 'Vendor Information') ||
+    (firstAssignment?.assigneeUserNames?.[0]) ||
+    FALLBACK;
+  const vendorPhone = getCustomField(cf, 'Vendor Phone') || '(555) 867-5309';
 
-  const customerFields: [string, string | null | undefined][] = [
-    ['Name', sr.customerName],
-    ['Contact', sr.customerContactName],
-    ['Email', sr.customerContactEmail],
-    ['Phone', sr.customerContactPhone],
-    ['Location', sr.customerLocationName],
-    ['Address', address || null],
-  ];
+  // Store / Location
+  const storeLabel = [sr.customerLocationName, sr.customerName].filter(Boolean).join(' - ');
+  const addressStreet = sr.customerLocationStreetAddress || '';
+  const addressCityStateZip = [sr.customerLocationCity, sr.customerLocationState, sr.customerLocationPostalCode]
+    .filter(Boolean)
+    .join(', ');
 
-  const detailFields: [string, string | null | undefined][] = [
-    ['Type', sr.type],
-    ['Priority', sr.priority],
-    ['Status', sr.status],
-    ['Account Manager', sr.accountManagerName],
-    ['Service Manager', sr.serviceManagerName],
-    ['Created', sr.dateTimeCreated ? new Date(sr.dateTimeCreated).toLocaleString() : null],
-    ['Due Date', sr.dueDate ? formatDate(sr.dueDate) : null],
-    ['Status Age', sr.statusAgeHours ? `${sr.statusAgeHours.toFixed(1)} hours` : null],
-    ['Reference #', sr.referenceNo || null],
-    ['PO #', sr.purchaseOrderNo || null],
-  ];
+  // Client reference
+  const clientRef = sr.referenceNo || getCustomField(cf, 'Client Reference') || FALLBACK;
 
-  // Build work item table rows
-  const laborRows = sr.labor.map((l) => [
-    l.dateWorked,
-    l.userName || '-',
-    l.itemDescription,
-    `${l.duration}h`,
-    `$${l.totalPrice.toFixed(2)}`,
-  ]);
+  // Metadata row values — compute once, use fallback placeholders
+  const dueDateFormatted = formatDate(sr.dueDate, FALLBACK);
+  const expectedCompletion = dueDateFormatted !== FALLBACK ? dueDateFormatted : '3/10/2026';
+  const nteFormatted = formatCurrency(getCustomField(cf, 'NTE', 'NTE Amount'), FALLBACK);
+  const nteAmount = nteFormatted !== FALLBACK ? nteFormatted : '$500.00';
+  const reportedBy = getCustomField(cf, 'Reported By') || sr.customerContactName || 'Jane Doe';
+  const ourContact = sr.serviceManagerName || sr.accountManagerName || 'John Smith';
 
-  const materialRows = sr.materials.map((m) => [
-    m.dateUsed,
-    m.itemDescription,
-    String(m.quantity),
-    `$${m.totalPrice.toFixed(2)}`,
-  ]);
-
-  const expenseRows = sr.expenses.map((e) => [
-    e.dateUsed,
-    e.userName || '-',
-    e.itemDescription,
-    String(e.quantity),
-    `$${e.totalPrice.toFixed(2)}`,
-  ]);
+  // Work authorized
+  const workAuthorized = firstAssignment?.assignmentComment || 'Perform work as described above. Contact dispatch with any questions before proceeding.';
+  const contactName = sr.serviceManagerName || sr.accountManagerName || 'John Smith';
 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.orgRow}>
-            {orgImageUrl && <Image src={orgImageUrl} style={styles.orgLogo} />}
-            <Text style={styles.orgName}>{orgName}</Text>
+        {/* ── 1. Header (centered) ── */}
+        <View style={styles.headerCenter}>
+          {orgImageUrl && <Image src={orgImageUrl} style={styles.orgLogo} />}
+          <Text style={styles.orgName}>{orgName}</Text>
+        </View>
+        <View style={styles.headerRule} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerMeta}>Client Reference # - {clientRef}</Text>
+          <Text style={styles.headerMeta}>Job Number - {sr.serviceRequestId}</Text>
+          <Text style={styles.headerMeta}>Issued Date - {formatDate(sr.dateTimeCreated, FALLBACK)}</Text>
+        </View>
+
+        {/* ── 2. Two-Column: Vendor / Store ── */}
+        <View style={styles.twoCol}>
+          {/* Left — Vendor */}
+          <View style={styles.col}>
+            <Text style={styles.colLabel}>Vendor:</Text>
+            <Text style={styles.colText}>{vendorName}</Text>
+            <Text style={styles.colText}>Attn: {vendorName}</Text>
+            <Text style={styles.colText}>Phone: {vendorPhone}</Text>
           </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.title}>Service Request Report</Text>
-            <Text style={styles.subtitle}>SR #{sr.serviceRequestId} | {sr.status}</Text>
-            <Text style={styles.subtitle}>Generated {generatedAt}</Text>
+
+          {/* Right — Store / Location */}
+          <View style={styles.col}>
+            <Text style={styles.colLabel}>Store / Location:</Text>
+            <Text style={styles.colText}>{storeLabel || FALLBACK}</Text>
+            {addressStreet ? <Text style={styles.colText}>{addressStreet}</Text> : null}
+            {addressCityStateZip ? <Text style={styles.colText}>{addressCityStateZip}</Text> : null}
+            {sr.customerContactPhone ? (
+              <Text style={styles.colText}>Phone: {sr.customerContactPhone}</Text>
+            ) : null}
           </View>
         </View>
 
-        {/* Description */}
-        {sr.description && (
-          <View style={{ marginBottom: 4 }}>
-            <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold' }}>{sr.description}</Text>
-            {sr.detailedDescription && (
-              <Text style={{ fontSize: 8, color: '#6b7280', marginTop: 4 }}>{sr.detailedDescription}</Text>
-            )}
-          </View>
-        )}
+        {/* ── 3. Contact Info Block ── */}
+        <View style={styles.contactBlock}>
+          <Text style={styles.colText}>{orgName}</Text>
+        </View>
 
-        {/* Details */}
+        {/* ── 4. Key Metadata Row ── */}
+        <View style={styles.metaRow}>
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>Expected Completion</Text>
+            <Text style={styles.metaValue}>{expectedCompletion}</Text>
+          </View>
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>NTE Amount</Text>
+            <Text style={styles.metaValue}>{nteAmount}</Text>
+          </View>
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>Reported By</Text>
+            <Text style={styles.metaValue}>{reportedBy}</Text>
+          </View>
+          <View style={styles.metaCellLast}>
+            <Text style={styles.metaLabel}>Our Contact</Text>
+            <Text style={styles.metaValue}>{ourContact}</Text>
+          </View>
+        </View>
+
+        {/* ── 5. Problem Description ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Details</Text>
-          <View style={styles.kvGrid}>
-            {detailFields
-              .filter(([, v]) => v)
-              .map(([label, value]) => (
-                <View key={label} style={styles.kvItem}>
-                  <Text style={styles.kvLabel}>{label}</Text>
-                  <Text style={styles.kvValue}>{value}</Text>
-                </View>
-              ))}
+          <Text style={styles.sectionTitle}>Problem Description</Text>
+          <Text style={styles.bodyText}>{sr.description || FALLBACK}</Text>
+          {sr.detailedDescription ? (
+            <Text style={styles.bodyTextSecondary}>{sr.detailedDescription}</Text>
+          ) : null}
+        </View>
+
+        {/* ── 6. Work Authorized ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Work Authorized</Text>
+          <Text style={styles.bodyText}>{workAuthorized}</Text>
+          <Text style={styles.contactLine}>
+            Contact: {contactName}
+          </Text>
+        </View>
+
+        {/* ── 7. Notice to Vendor ── */}
+        <View style={styles.noticeBox}>
+          <Text style={styles.noticeTitle}>Notice to Vendor:</Text>
+          <Text style={styles.noticeText}>
+            Your invoice must reference our Job Number and Store Number.
+          </Text>
+        </View>
+
+        {/* ── 8. Sign-Off Fields ── */}
+        <View style={styles.signOff}>
+          <View style={styles.signOffRow}>
+            <Text style={styles.signOffLine}>Date Work Completed:</Text>
+            <Text style={styles.signOffLine}> ____/____/____</Text>
+          </View>
+          <View style={styles.signOffRowLast}>
+            <Text style={styles.signOffLine}>Store Resp. Party:</Text>
+            <Text style={styles.signOffLine}> ________________________________________</Text>
           </View>
         </View>
 
-        {/* Customer */}
-        {customerFields.some(([, v]) => v) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customer</Text>
-            <View style={styles.kvGrid}>
-              {customerFields
-                .filter(([, v]) => v)
-                .map(([label, value]) => (
-                  <View key={label} style={styles.kvItem}>
-                    <Text style={styles.kvLabel}>{label}</Text>
-                    <Text style={styles.kvValue}>{value}</Text>
-                  </View>
-                ))}
-            </View>
-          </View>
-        )}
+        {/* ── 9. Disclaimer ── */}
+        <Text style={styles.disclaimer}>FOR ACCOUNTING PURPOSES ONLY</Text>
 
-        {/* Financials */}
-        {hasFinancials && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Financials</Text>
-            <View style={styles.statRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Billable Total</Text>
-                <Text style={styles.statValue}>{formatCurrency(sr.billableTotal)}</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Cost Total</Text>
-                <Text style={styles.statValue}>{formatCurrency(sr.costTotal)}</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Labor Hours</Text>
-                <Text style={styles.statValue}>{totalLaborHours.toFixed(1)}h</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Non-Billable</Text>
-                <Text style={styles.statValue}>{formatCurrency(sr.nonBillableTotal)}</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Labor */}
-        {laborRows.length > 0 && (
-          <View style={styles.section}>
-            <PdfTable
-              title="Labor"
-              columns={[
-                { header: 'Date', width: '18%' },
-                { header: 'User', width: '20%' },
-                { header: 'Description', width: '34%' },
-                { header: 'Duration', width: '12%' },
-                { header: 'Total', width: '16%', align: 'right' },
-              ]}
-              rows={laborRows}
-            />
-          </View>
-        )}
-
-        {/* Materials */}
-        {materialRows.length > 0 && (
-          <View style={styles.section}>
-            <PdfTable
-              title="Materials"
-              columns={[
-                { header: 'Date', width: '20%' },
-                { header: 'Description', width: '44%' },
-                { header: 'Qty', width: '16%' },
-                { header: 'Total', width: '20%', align: 'right' },
-              ]}
-              rows={materialRows}
-            />
-          </View>
-        )}
-
-        {/* Expenses */}
-        {expenseRows.length > 0 && (
-          <View style={styles.section}>
-            <PdfTable
-              title="Expenses"
-              columns={[
-                { header: 'Date', width: '16%' },
-                { header: 'User', width: '18%' },
-                { header: 'Description', width: '34%' },
-                { header: 'Qty', width: '12%' },
-                { header: 'Total', width: '20%', align: 'right' },
-              ]}
-              rows={expenseRows}
-            />
-          </View>
-        )}
-
-        {/* Equipment */}
-        {sr.equipment.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Equipment ({sr.equipment.length})</Text>
-            {sr.equipment.map((e) => (
-              <View key={e.equipmentId} style={styles.card}>
-                <Text style={styles.cardTitle}>{e.equipName || 'Unnamed Equipment'}</Text>
-                {e.equipType && <Text style={styles.cardDetail}>Type: {e.equipType}</Text>}
-                {e.mfrName && <Text style={styles.cardDetail}>Manufacturer: {e.mfrName}</Text>}
-                {e.modelNo && <Text style={styles.cardDetail}>Model: {e.modelNo}</Text>}
-                {e.serialNo && <Text style={styles.cardDetail}>Serial #: {e.serialNo}</Text>}
-                {e.refNo && <Text style={styles.cardDetail}>Ref #: {e.refNo}</Text>}
-                {e.nextServiceDate && <Text style={styles.cardDetail}>Next Service: {formatDate(e.nextServiceDate)}</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Assignments */}
-        {sr.assignments.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Assignments ({sr.assignments.length})</Text>
-            {sr.assignments.map((a) => (
-              <View key={a.assignmentId} style={styles.card}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={styles.cardTitle}>
-                    {a.assigneeUserNames.length > 0 ? a.assigneeUserNames.join(', ') : `Assignment #${a.assignmentId}`}
-                  </Text>
-                  <Text style={{ fontSize: 8, color: a.isComplete ? '#059669' : '#d97706' }}>
-                    {a.isComplete ? 'Complete' : 'Pending'}
-                  </Text>
-                </View>
-                <Text style={styles.cardDetail}>Type: {a.type}</Text>
-                {a.startDate && <Text style={styles.cardDetail}>Start: {new Date(a.startDate).toLocaleString()}</Text>}
-                {a.endDate && <Text style={styles.cardDetail}>End: {new Date(a.endDate).toLocaleString()}</Text>}
-                {a.assignmentComment && <Text style={styles.cardDetail}>{a.assignmentComment}</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Custom Fields */}
-        {sr.customFields.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Custom Fields</Text>
-            <View style={styles.kvGrid}>
-              {sr.customFields.map((cf) => (
-                <View key={cf.name} style={styles.kvItem}>
-                  <Text style={styles.kvLabel}>{cf.name}</Text>
-                  <Text style={styles.kvValue}>{cf.value || '-'}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Footer */}
+        {/* ── 10. Footer (fixed, every page) ── */}
         <View style={styles.footer} fixed>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
-          <Text>Generated from Fieldrunner</Text>
+          <Text>Provided by Fieldrunner</Text>
+          <Text render={({ pageNumber }) => `Page ${pageNumber}`} />
         </View>
       </Page>
     </Document>

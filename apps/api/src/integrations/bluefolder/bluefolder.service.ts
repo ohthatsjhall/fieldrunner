@@ -1,12 +1,21 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { BlueFolderClientService, BlueFolderApiError } from './bluefolder-client.service';
+import {
+  BlueFolderClientService,
+  BlueFolderApiError,
+} from './bluefolder-client.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { BlueFolderUsersService } from './bluefolder-users.service';
-import { mapServiceRequestListItem, mapServiceRequestDetail, mapServiceRequestFile } from './mappers';
+import {
+  mapServiceRequestListItem,
+  mapServiceRequestDetail,
+  mapServiceRequestFile,
+} from './mappers';
 import type {
   BfServiceRequestListResponse,
   BfServiceRequestGetResponse,
   BfServiceRequestFilesResponse,
+  BfServiceRequestHistoryResponse,
+  BfServiceRequestHistoryEntry,
   BfServiceRequestListFilter,
 } from './types/bluefolder-api.types';
 import type {
@@ -50,7 +59,10 @@ export class BlueFolderService {
 
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
     const managerIds = this.collectSummaryUserIds(summaries);
-    const userMap = await this.usersService.buildUserMap(organizationId, managerIds);
+    const userMap = await this.usersService.buildUserMap(
+      organizationId,
+      managerIds,
+    );
     this.enrichSummaries(summaries, userMap);
 
     return summaries;
@@ -76,7 +88,10 @@ export class BlueFolderService {
 
     const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
     const userIds = this.collectDetailUserIds(detail);
-    const userMap = await this.usersService.buildUserMap(organizationId, userIds);
+    const userMap = await this.usersService.buildUserMap(
+      organizationId,
+      userIds,
+    );
     this.enrichDetail(detail, userMap);
 
     return detail;
@@ -109,6 +124,27 @@ export class BlueFolderService {
       }
       throw error;
     }
+  }
+
+  async getServiceRequestHistory(
+    clerkOrgId: string,
+    serviceRequestId: number,
+  ): Promise<BfServiceRequestHistoryEntry[]> {
+    const apiKey = await this.getApiKey(clerkOrgId);
+    return this.getServiceRequestHistoryWithKey(apiKey, serviceRequestId);
+  }
+
+  async getServiceRequestHistoryWithKey(
+    apiKey: string,
+    serviceRequestId: number,
+  ): Promise<BfServiceRequestHistoryEntry[]> {
+    const result = await this.client.request<BfServiceRequestHistoryResponse>(
+      'serviceRequests/getHistory.aspx',
+      apiKey,
+      { serviceRequestId: String(serviceRequestId) },
+    );
+
+    return result.serviceRequestHistoryList?.serviceRequestHistory ?? [];
   }
 
   private collectSummaryUserIds(summaries: ServiceRequestSummary[]): number[] {

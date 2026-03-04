@@ -49,7 +49,11 @@ describe('mapBuildZoomContractor', () => {
     expect(result.city).toBe('Pittsburgh');
     expect(result.state).toBe('PA');
     expect(result.country).toBe('US');
-    expect(result.types).toEqual(['Plumbing', 'Drain Cleaning', 'Water Heater']);
+    expect(result.types).toEqual([
+      'Plumbing',
+      'Drain Cleaning',
+      'Water Heater',
+    ]);
     expect(result.email).toBeNull();
   });
 
@@ -75,9 +79,7 @@ describe('mapBuildZoomContractor', () => {
   });
 
   it('should fallback sourceId to bz-{contractorName} when URL missing', () => {
-    const result = mapBuildZoomContractor(
-      makeContractor({ url: '' }),
-    );
+    const result = mapBuildZoomContractor(makeContractor({ url: '' }));
     expect(result.sourceId).toBe('bz-Acme Plumbing Inc');
   });
 
@@ -107,16 +109,12 @@ describe('mapBuildZoomContractor', () => {
   });
 
   it('should NOT map bzScore to rating', () => {
-    const result = mapBuildZoomContractor(
-      makeContractor({ bzScore: '150' }),
-    );
+    const result = mapBuildZoomContractor(makeContractor({ bzScore: '150' }));
     expect(result.rating).toBeNull();
   });
 
   it('should map reviewsCount to reviewCount', () => {
-    const result = mapBuildZoomContractor(
-      makeContractor({ reviewsCount: 12 }),
-    );
+    const result = mapBuildZoomContractor(makeContractor({ reviewsCount: 12 }));
     expect(result.reviewCount).toBe(12);
   });
 

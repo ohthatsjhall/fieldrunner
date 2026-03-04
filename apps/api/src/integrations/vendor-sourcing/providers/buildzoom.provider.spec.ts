@@ -395,7 +395,9 @@ describe('buildSearchUrl', () => {
 
   it('should map "HVAC" to "hvac-contractors" via known slug', () => {
     const url = buildSearchUrl('Pittsburgh, PA', 'HVAC');
-    expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/hvac-contractors');
+    expect(url).toBe(
+      'https://www.buildzoom.com/pittsburgh-pa/hvac-contractors',
+    );
   });
 
   it('should map "General Maintenance" to "general-contractors" via known slug', () => {
@@ -424,9 +426,7 @@ describe('extractProfileUrls', () => {
       'https://www.buildzoom.com/contractor/acme',
     ];
     const result = extractProfileUrls(links);
-    expect(result).toEqual([
-      'https://www.buildzoom.com/contractor/acme',
-    ]);
+    expect(result).toEqual(['https://www.buildzoom.com/contractor/acme']);
   });
 
   it('should return [] when no contractor links exist', () => {

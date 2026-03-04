@@ -91,7 +91,10 @@ export class BuildZoomProvider implements PlaceProvider {
       return [];
     }
 
-    const profileUrls = extractProfileUrls(result.links).slice(0, MAX_DISCOVERED_URLS);
+    const profileUrls = extractProfileUrls(result.links).slice(
+      0,
+      MAX_DISCOVERED_URLS,
+    );
     if (profileUrls.length === 0) {
       this.logger.warn('No contractor profile URLs found on search page');
       return [];
@@ -134,8 +137,7 @@ export class BuildZoomProvider implements PlaceProvider {
 
     if (!result) return null;
 
-    const description =
-      (result.metadata?.description as string) ?? null;
+    const description = (result.metadata?.description as string) ?? null;
     const merged = mergeWithMetadata(
       { ...result.data, url },
       description ? parseMetadataDescription(description) : {},
@@ -159,10 +161,7 @@ const BUILDZOOM_SLUG_MAP: Record<string, string> = {
   'paving & asphalt': 'paving-contractors',
 };
 
-export function buildSearchUrl(
-  locationName: string,
-  query: string,
-): string {
+export function buildSearchUrl(locationName: string, query: string): string {
   const locationSlug = locationName
     .toLowerCase()
     .replace(/,\s*/g, '-')
@@ -178,7 +177,10 @@ export function buildSearchUrl(
   // Only pluralize profession nouns (plumber→plumbers, contractor→contractors).
   // Skip abstract/gerund trade names (refrigeration, plumbing, roofing, maintenance).
   const lastWord = query.toLowerCase().split(/\s+/).pop() ?? '';
-  if (!tradeSlug.endsWith('s') && !/(?:tion|ing|ment|ance|ence)$/.test(lastWord)) {
+  if (
+    !tradeSlug.endsWith('s') &&
+    !/(?:tion|ing|ment|ance|ence)$/.test(lastWord)
+  ) {
     tradeSlug += 's';
   }
 
@@ -210,9 +212,7 @@ export function parseMetadataDescription(
     partial.totalPermittedProjects = parseInt(permitMatch[1], 10);
   }
 
-  const valueMatch = description.match(
-    /for\s+\$([0-9,]+)/i,
-  );
+  const valueMatch = description.match(/for\s+\$([0-9,]+)/i);
   if (valueMatch) {
     partial.typicalPermitValue = `$${valueMatch[1]}`;
   }

@@ -5,13 +5,17 @@ type Brand<T, B extends string> = T & { readonly [__brand]: B };
 // -- Union types --
 export type VendorSource = 'google_places' | 'buildzoom';
 
+export type EventSource = 'bluefolder' | 'agent';
+
 export type ServiceRequestStatus =
   | 'New'
   | 'Proposed'
   | 'Assigned'
+  | 'Vendor Assigned'
   | 'In Progress'
   | 'Job Costing'
   | 'Work Complete'
+  | 'Customer Invoiced'
   | 'Waiting On Invoice'
   | 'WO Needs Fix'
   | 'Cancelled'
@@ -167,6 +171,19 @@ export type ServiceRequest = {
   syncedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ServiceRequestEvent = {
+  id: string;
+  organizationId: string;
+  serviceRequestId: string;
+  fromStatus: ServiceRequestStatus | null;
+  toStatus: ServiceRequestStatus;
+  occurredAt: Date;
+  durationInStatusMs: number | null;
+  source: EventSource | null;
+  bluefolderHistoryId: number | null;
+  createdAt: Date;
 };
 
 export type ServiceRequestStats = {
