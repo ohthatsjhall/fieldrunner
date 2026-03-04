@@ -1,6 +1,7 @@
 export type { AuthUser, AuthOrganization } from './auth.js';
 export type {
   VendorSource,
+  EventSource,
   ServiceRequestStatus,
   ValidEmail,
   User,
