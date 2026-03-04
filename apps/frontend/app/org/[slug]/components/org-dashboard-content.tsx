@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TableProperties, Columns3, CalendarDays, ChevronDown } from 'lucide-react';
+import { usePersistedState } from '@/lib/use-persisted-state';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -72,56 +73,32 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
   const lastSyncedAt = syncData?.lastSyncedAt ?? null;
 
   const [hideClosed, setHideClosed] = useState(true);
-  const [daysFilter, setDaysFilter] = useState<number | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = localStorage.getItem('sr-days-filter');
-      if (saved === null) return null;
-      const parsed = Number(saved);
-      return [7, 14, 30].includes(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  });
 
-  const handleDaysFilter = useCallback((value: string) => {
-    const next = value === 'all' ? null : Number(value);
-    setDaysFilter(next);
-    try {
-      if (next === null) {
-        localStorage.removeItem('sr-days-filter');
-      } else {
-        localStorage.setItem('sr-days-filter', String(next));
-      }
-    } catch {
-      // localStorage unavailable — ignore
-    }
-  }, []);
+  const DAYS_FILTER_LABELS: Record<string, string> = {
+    '7': 'Last 7 days',
+    '14': 'Last 14 days',
+    '30': 'Last 30 days',
+  };
 
-  const daysFilterLabel =
-    daysFilter === 7 ? 'Last 7 days' :
-    daysFilter === 14 ? 'Last 14 days' :
-    daysFilter === 30 ? 'Last 30 days' :
-    'All time';
+  const [daysFilter, setDaysFilter] = usePersistedState<number | null>(
+    'sr-days-filter',
+    null,
+    (v) => (typeof v === 'number' && [7, 14, 30].includes(v) ? v : undefined),
+  );
 
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>(() => {
-    if (typeof window === 'undefined') return 'table';
-    try {
-      const saved = localStorage.getItem('sr-view-mode');
-      return saved === 'kanban' ? 'kanban' : 'table';
-    } catch {
-      return 'table';
-    }
-  });
+  const handleDaysFilter = (value: string) => {
+    setDaysFilter(value === 'all' ? null : Number(value));
+  };
 
-  const handleViewMode = useCallback((mode: 'table' | 'kanban') => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('sr-view-mode', mode);
-    } catch {
-      // localStorage unavailable — ignore
-    }
-  }, []);
+  const daysFilterLabel = daysFilter !== null
+    ? (DAYS_FILTER_LABELS[String(daysFilter)] ?? 'All time')
+    : 'All time';
+
+  const [viewMode, setViewMode] = usePersistedState<'table' | 'kanban'>(
+    'sr-view-mode',
+    'table',
+    (v) => (v === 'kanban' ? 'kanban' : v === 'table' ? 'table' : undefined),
+  );
 
   const visibleRequests = useMemo(() => {
     let filtered = serviceRequests;
@@ -218,7 +195,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
           <div className="flex items-center justify-between">
             <div className="inline-flex overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
               <button
-                onClick={() => handleViewMode('table')}
+                onClick={() => setViewMode('table')}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors',
                   viewMode === 'table'
@@ -230,7 +207,7 @@ export function OrgDashboardContent({ slug }: { slug: string }) {
                 Table
               </button>
               <button
-                onClick={() => handleViewMode('kanban')}
+                onClick={() => setViewMode('kanban')}
                 className={cn(
                   'inline-flex items-center gap-1.5 border-l border-zinc-200 px-3 py-1.5 text-sm font-medium transition-colors dark:border-zinc-800',
                   viewMode === 'kanban'

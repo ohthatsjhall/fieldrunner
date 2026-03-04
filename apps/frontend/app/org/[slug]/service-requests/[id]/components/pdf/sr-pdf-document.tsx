@@ -1,10 +1,12 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
-import type { ServiceRequestDetail, CustomFieldValue } from '@fieldrunner/shared';
+import type { ServiceRequestDetail } from '@fieldrunner/shared';
+import { formatDate, formatCurrency, getCustomField } from '../utils/sr-formatting';
 
 const GRAY = '#6b7280';
 const DARK = '#1f2937';
 const BORDER = '#d1d5db';
 const LIGHT_GRAY = '#f3f4f6';
+const FALLBACK = '-';
 
 const styles = StyleSheet.create({
   page: {
@@ -66,7 +68,12 @@ const styles = StyleSheet.create({
   // Sign-off
   signOff: { marginTop: 20 },
   signOffLine: { fontSize: 9, marginBottom: 12 },
+  signOffRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14 },
+  signOffRowLast: { flexDirection: 'row', alignItems: 'flex-end' },
   blankLine: { borderBottomWidth: 0.5, borderBottomColor: DARK, width: 200, marginLeft: 8, display: 'flex' },
+
+  // Contact line (Work Authorized section)
+  contactLine: { fontSize: 9, color: DARK, lineHeight: 1.4, marginTop: 6 },
 
   // Disclaimer
   disclaimer: { marginTop: 16, textAlign: 'center', fontSize: 8, fontFamily: 'Helvetica-Bold', color: GRAY },
@@ -87,24 +94,6 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatCurrency(amount: string | number | undefined): string {
-  if (amount === undefined || amount === '') return '-';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '-';
-  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleDateString();
-}
-
-function getCustomField(fields: CustomFieldValue[], ...names: string[]): string | undefined {
-  const lower = names.map((n) => n.toLowerCase());
-  const match = fields.find((f) => lower.includes(f.name.toLowerCase()));
-  return match?.value || undefined;
-}
-
 export interface SrPdfDocumentProps {
   sr: ServiceRequestDetail;
   orgName: string;
@@ -120,7 +109,7 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
   const vendorName =
     getCustomField(cf, 'Vendor', 'Vendor Information') ||
     (firstAssignment?.assigneeUserNames?.[0]) ||
-    '-';
+    FALLBACK;
   const vendorPhone = getCustomField(cf, 'Vendor Phone') || '(555) 867-5309';
 
   // Store / Location
@@ -131,11 +120,13 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
     .join(', ');
 
   // Client reference
-  const clientRef = sr.referenceNo || getCustomField(cf, 'Client Reference') || '-';
+  const clientRef = sr.referenceNo || getCustomField(cf, 'Client Reference') || FALLBACK;
 
-  // Metadata row values
-  const expectedCompletion = formatDate(sr.dueDate) !== '-' ? formatDate(sr.dueDate) : '3/10/2026';
-  const nteAmount = formatCurrency(getCustomField(cf, 'NTE', 'NTE Amount')) !== '-' ? formatCurrency(getCustomField(cf, 'NTE', 'NTE Amount')) : '$500.00';
+  // Metadata row values — compute once, use fallback placeholders
+  const dueDateFormatted = formatDate(sr.dueDate, FALLBACK);
+  const expectedCompletion = dueDateFormatted !== FALLBACK ? dueDateFormatted : '3/10/2026';
+  const nteFormatted = formatCurrency(getCustomField(cf, 'NTE', 'NTE Amount'), FALLBACK);
+  const nteAmount = nteFormatted !== FALLBACK ? nteFormatted : '$500.00';
   const reportedBy = getCustomField(cf, 'Reported By') || sr.customerContactName || 'Jane Doe';
   const ourContact = sr.serviceManagerName || sr.accountManagerName || 'John Smith';
 
@@ -155,7 +146,7 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
         <View style={styles.headerCenter}>
           <Text style={styles.headerMeta}>Client Reference # - {clientRef}</Text>
           <Text style={styles.headerMeta}>Job Number - {sr.serviceRequestId}</Text>
-          <Text style={styles.headerMeta}>Issued Date - {formatDate(sr.dateTimeCreated)}</Text>
+          <Text style={styles.headerMeta}>Issued Date - {formatDate(sr.dateTimeCreated, FALLBACK)}</Text>
         </View>
 
         {/* ── 2. Two-Column: Vendor / Store ── */}
@@ -171,7 +162,7 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
           {/* Right — Store / Location */}
           <View style={styles.col}>
             <Text style={styles.colLabel}>Store / Location:</Text>
-            <Text style={styles.colText}>{storeLabel || '-'}</Text>
+            <Text style={styles.colText}>{storeLabel || FALLBACK}</Text>
             {addressStreet ? <Text style={styles.colText}>{addressStreet}</Text> : null}
             {addressCityStateZip ? <Text style={styles.colText}>{addressCityStateZip}</Text> : null}
             {sr.customerContactPhone ? (
@@ -208,7 +199,7 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
         {/* ── 5. Problem Description ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Problem Description</Text>
-          <Text style={styles.bodyText}>{sr.description || '-'}</Text>
+          <Text style={styles.bodyText}>{sr.description || FALLBACK}</Text>
           {sr.detailedDescription ? (
             <Text style={styles.bodyTextSecondary}>{sr.detailedDescription}</Text>
           ) : null}
@@ -218,7 +209,7 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Work Authorized</Text>
           <Text style={styles.bodyText}>{workAuthorized}</Text>
-          <Text style={{ ...styles.bodyText, marginTop: 6 }}>
+          <Text style={styles.contactLine}>
             Contact: {contactName}
           </Text>
         </View>
@@ -233,11 +224,11 @@ export function SrPdfDocument({ sr, orgName, orgImageUrl, generatedAt }: SrPdfDo
 
         {/* ── 8. Sign-Off Fields ── */}
         <View style={styles.signOff}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14 }}>
+          <View style={styles.signOffRow}>
             <Text style={styles.signOffLine}>Date Work Completed:</Text>
             <Text style={styles.signOffLine}> ____/____/____</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+          <View style={styles.signOffRowLast}>
             <Text style={styles.signOffLine}>Store Resp. Party:</Text>
             <Text style={styles.signOffLine}> ________________________________________</Text>
           </View>

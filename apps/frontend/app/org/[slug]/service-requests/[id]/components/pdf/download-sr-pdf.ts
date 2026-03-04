@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import type { ServiceRequestDetail } from '@fieldrunner/shared';
 import { SrPdfDocument } from './sr-pdf-document';
+import { sanitizeFilename } from '../utils/sr-formatting';
 
 interface DownloadSrPdfParams {
   sr: ServiceRequestDetail;
@@ -12,20 +13,21 @@ interface DownloadSrPdfParams {
 async function fetchLogoAsDataUri(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[fetchLogoAsDataUri] HTTP ${res.status} for ${url}`);
+      return null;
+    }
     const blob = await res.blob();
-    return await new Promise<string>((resolve) => {
+    return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('FileReader failed'));
       reader.readAsDataURL(blob);
     });
-  } catch {
+  } catch (err) {
+    console.warn('[fetchLogoAsDataUri] Failed to fetch logo:', err);
     return null;
   }
-}
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
 export async function downloadSrPdf({ sr, orgName, orgImageUrl }: DownloadSrPdfParams): Promise<void> {

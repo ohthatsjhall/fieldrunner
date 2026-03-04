@@ -4,6 +4,7 @@ import {
   Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw,
   MoreHorizontal, UserCheck, Paperclip,
 } from 'lucide-react';
+import { sanitizeFilename, getCustomField, formatDate, formatCurrency } from './utils/sr-formatting';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -90,28 +91,6 @@ function getScoreColor(score: number): string {
   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
 }
 
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-}
-
-function getCustomField(fields: { name: string; value: string }[], ...names: string[]): string | undefined {
-  const lower = names.map((n) => n.toLowerCase());
-  const match = fields.find((f) => lower.includes(f.name.toLowerCase()));
-  return match?.value || undefined;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return 'TBD';
-  return new Date(iso).toLocaleDateString();
-}
-
-function formatCurrency(amount: string | undefined): string {
-  if (!amount) return 'N/A';
-  const num = parseFloat(amount);
-  if (isNaN(num)) return 'N/A';
-  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function buildEmailBody(sr: ServiceRequestDetail, vendorName: string, orgName: string): string {
   const fullAddress = [
     sr.customerLocationStreetAddress,
@@ -173,24 +152,18 @@ function AcceptVendorModal({
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
   const [downloading, setDownloading] = useState(false);
-
-  // Reset fields when modal opens with a different candidate
-  const prevCandidateId = useRef(candidate.vendorId);
-  if (candidate.vendorId !== prevCandidateId.current) {
-    prevCandidateId.current = candidate.vendorId;
-    setTo(candidate.email ?? '');
-    setSubject(`Work Order #${sr.serviceRequestId} - ${sr.customerLocationName} - ${orgName}`);
-    setBody(buildEmailBody(sr, candidate.name, orgName));
-  }
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   async function handleDownloadPdf() {
     if (downloading) return;
     setDownloading(true);
+    setPdfError(null);
     try {
       const { downloadSrPdf } = await import('./pdf/download-sr-pdf');
       await downloadSrPdf({ sr, orgName, orgImageUrl });
     } catch (err) {
       console.error('[AcceptVendorModal] PDF generation failed:', err);
+      setPdfError('Failed to generate PDF. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -248,6 +221,7 @@ function AcceptVendorModal({
             )}
             <span className="truncate">{attachmentName}</span>
           </button>
+          {pdfError && <p className="text-sm text-destructive">{pdfError}</p>}
         </div>
 
         <DialogFooter>
@@ -297,20 +271,14 @@ function CategoryTags({ categories }: { categories: string[] }) {
 
 function VendorRow({
   candidate: c,
-  sr,
-  orgName,
-  orgImageUrl,
+  onAccept,
 }: {
   candidate: VendorCandidate;
-  sr: ServiceRequestDetail;
-  orgName: string;
-  orgImageUrl: string | null;
+  onAccept: (candidate: VendorCandidate) => void;
 }) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
-  const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <>
       <TableRow className="cursor-default">
         <TableCell className="text-center font-mono text-sm text-muted-foreground">
           {c.rank}
@@ -431,7 +399,7 @@ function VendorRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setModalOpen(true)}>
+              <DropdownMenuItem onClick={() => onAccept(c)}>
                 <UserCheck className="size-4" />
                 Accept Vendor
               </DropdownMenuItem>
@@ -439,16 +407,6 @@ function VendorRow({
           </DropdownMenu>
         </TableCell>
       </TableRow>
-
-      <AcceptVendorModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        candidate={c}
-        sr={sr}
-        orgName={orgName}
-        orgImageUrl={orgImageUrl}
-      />
-    </>
   );
 }
 
@@ -570,6 +528,7 @@ export function SrVendors({
   const orgName = organization?.name ?? 'Organization';
   const orgImageUrl = organization?.imageUrl ?? null;
 
+  const [selectedCandidate, setSelectedCandidate] = useState<VendorCandidate | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const prevSessionId = useRef(results?.sessionId);
   if (results?.sessionId !== prevSessionId.current) {
@@ -729,7 +688,7 @@ export function SrVendors({
               </TableHeader>
               <TableBody>
                 {visible.map((c) => (
-                  <VendorRow key={c.vendorId} candidate={c} sr={sr} orgName={orgName} orgImageUrl={orgImageUrl} />
+                  <VendorRow key={c.vendorId} candidate={c} onAccept={setSelectedCandidate} />
                 ))}
               </TableBody>
             </Table>
@@ -768,6 +727,17 @@ export function SrVendors({
             ` \u00B7 ${(results.durationMs / 1000).toFixed(1)}s`}
         </CardFooter>
       </Card>
+
+      {selectedCandidate && (
+        <AcceptVendorModal
+          open={!!selectedCandidate}
+          onOpenChange={(open) => { if (!open) setSelectedCandidate(null); }}
+          candidate={selectedCandidate}
+          sr={sr}
+          orgName={orgName}
+          orgImageUrl={orgImageUrl}
+        />
+      )}
     </TooltipProvider>
   );
 }
