@@ -133,9 +133,12 @@ async function main() {
         console.log(`  [DEBUG] All entryTypes: ${allTypes.join(', ')}`);
       }
 
-      // Filter to status change entries
+      // Filter to status changes and creation entries
       const statusChanges = historyEntries.filter(
         (e) => e.entryType === 'Status Changed',
+      );
+      const createdEntry = historyEntries.find(
+        (e) => e.entryType === 'Created',
       );
 
       if (statusChanges.length === 0) {
@@ -173,7 +176,19 @@ async function main() {
         (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
       );
 
+      // Chain from_status: infer from previous event's to_status
+      // First event defaults to 'New' (initial SR status per lifecycle)
+      for (let i = 0; i < events.length; i++) {
+        if (events[i].fromStatus == null) {
+          events[i].fromStatus = i > 0 ? events[i - 1].toStatus : 'New';
+        }
+      }
+
       // Compute durationInStatusMs between consecutive events
+      const createdAt = createdEntry
+        ? new Date(createdEntry.entryDate)
+        : sr.dateTimeCreated;
+
       const eventRows: (typeof serviceRequestEvents.$inferInsert)[] = [];
       for (let i = 0; i < events.length; i++) {
         const event = events[i];
@@ -182,10 +197,10 @@ async function main() {
         if (i > 0) {
           durationInStatusMs =
             event.occurredAt.getTime() - events[i - 1].occurredAt.getTime();
-        } else if (sr.dateTimeCreated) {
+        } else if (createdAt) {
           // First status change — duration from creation
           durationInStatusMs =
-            event.occurredAt.getTime() - sr.dateTimeCreated.getTime();
+            event.occurredAt.getTime() - createdAt.getTime();
         }
 
         eventRows.push({
