@@ -35,6 +35,10 @@ export const serviceRequestEvents = pgTable(
       .notNull(),
   },
   (t) => [
+    // PostgreSQL treats NULL as distinct in UNIQUE constraints, so rows where
+    // bluefolderHistoryId is NULL (i.e. ongoing sync events) are never
+    // considered duplicates. This constraint only deduplicates backfill rows
+    // (where bluefolderHistoryId is non-null).
     unique('uq_sr_event_bf_history').on(
       t.serviceRequestId,
       t.bluefolderHistoryId,

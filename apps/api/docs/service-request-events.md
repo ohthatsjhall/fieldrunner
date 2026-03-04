@@ -26,7 +26,7 @@ flowchart LR
 | `service_request_id` | uuid FK | no | - | Parent SR |
 | `from_status` | text | yes | - | null for first event |
 | `to_status` | text | no | - | New status |
-| `occurred_at` | timestamptz | no | - | When transition happened (BF timestamp) |
+| `occurred_at` | timestamptz | no | - | When transition was detected (BF timestamp for backfill, sync timestamp for ongoing capture) |
 | `duration_in_status_ms` | bigint | yes | - | Pre-computed ms in previous status |
 | `source` | text | yes | - | `'bluefolder'`, `'agent'` later |
 | `bluefolder_history_id` | integer | yes | - | For backfill dedup |
@@ -43,11 +43,15 @@ stateDiagram-v2
     New --> Proposed
     New --> Assigned
     Proposed --> Assigned
+    Assigned --> VendorAssigned: Vendor Assigned
+    VendorAssigned --> InProgress: In Progress
     Assigned --> InProgress: In Progress
     InProgress --> JobCosting: Job Costing
     InProgress --> WorkComplete: Work Complete
     JobCosting --> WorkComplete
+    WorkComplete --> CustomerInvoiced: Customer Invoiced
     WorkComplete --> WaitingOnInvoice: Waiting On Invoice
+    CustomerInvoiced --> Closed
     WaitingOnInvoice --> Closed
     WorkComplete --> Closed
     New --> Cancelled
@@ -83,7 +87,7 @@ sequenceDiagram
 
 **Key behaviors:**
 - New SRs get a creation event (`from_status = null`)
-- `duration_in_status_ms` is null for ongoing events (computed retroactively or via backfill)
+- `duration_in_status_ms` is always null for ongoing sync events (no full history available to compute it); backfill events compute it from consecutive timestamps
 - `occurred_at` uses the sync timestamp (not BF timestamp, since we detect at sync time)
 
 ## Backfill Process
@@ -100,7 +104,7 @@ sequenceDiagram
         loop Each SR (with rate limiting)
             Script->>BF: getHistory.aspx
             BF-->>Script: history entries
-            Note over Script: Filter statusChange entries
+            Note over Script: Filter "Status Changed" entries
             Note over Script: Parse "Status changed from X to Y"
             Note over Script: Sort chronologically
             Note over Script: Compute durationInStatusMs
@@ -109,7 +113,7 @@ sequenceDiagram
     end
 ```
 
-**Rate limiting:** 800ms between API calls (~75 req/min, under BF's 100/min limit). On 429 errors, respects `Retry-After` header.
+**Rate limiting:** 1200ms between API calls (~50 req/min, well under BF's 100/min limit). On 429 errors, respects `Retry-After` header.
 
 **Idempotent:** Uses `onConflictDoNothing` on `(service_request_id, bluefolder_history_id)` unique constraint. Safe to re-run.
 

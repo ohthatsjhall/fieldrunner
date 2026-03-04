@@ -645,7 +645,7 @@ export interface BfServiceRequestHistoryEntry {
   description: string;
   /** @datetime When the entry was created. */
   entryDate: string;
-  /** Entry type (e.g. "comment", "edit", "close", "statusChange"). */
+  /** Entry type (e.g. "Comment", "Edit", "Close", "Status Changed"). */
   entryType: string;
   /** @boolean Whether the entry is private (not visible to customers). */
   private: string;
