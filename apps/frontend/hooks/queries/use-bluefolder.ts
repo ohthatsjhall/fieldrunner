@@ -193,7 +193,7 @@ export function useSyncBlueFolder() {
         { lastSyncedAt: data.syncedAt },
       );
 
-      // Invalidate stats and the full SR subtree so lists/details refetch.
+      // Invalidate stats, SR subtree, and analytics so lists/details/charts refetch.
       queryClient.invalidateQueries({
         queryKey: queryKeys.bluefolder.stats(orgId),
         refetchType: 'all',
@@ -201,6 +201,9 @@ export function useSyncBlueFolder() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.bluefolder.serviceRequests.all(orgId),
         refetchType: 'all',
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.analytics.all(orgId),
       });
     },
   });

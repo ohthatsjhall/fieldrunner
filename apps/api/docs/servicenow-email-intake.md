@@ -48,16 +48,16 @@ LIMIT 5;
 flowchart LR
     SN[ServiceNow / Nuvolo] -->|dispatch email| OL[Outlook<br>jobs@rodcoservices.com]
     OL -->|Microsoft Graph API| FR[Fieldrunner API<br>EmailIntakeService]
-    FR -->|Phase 1| DQ[(Draft Queue<br>email_intake_drafts)]
-    DQ -->|PM approves| BF[BlueFolder API<br>serviceRequests/add.aspx]
-    FR -->|Phase 2| BF
-    BF -->|next sync| DB[(service_requests)]
+    FR -->|resolve location| BF_LOC[BlueFolder API<br>customers/addLocation.aspx]
+    FR -->|create SR| BF_SR[BlueFolder API<br>serviceRequests/add.aspx]
+    BF_SR -->|next sync| DB[(service_requests)]
     DB -->|event| EE[EventEmitter<br>sync.completed]
+    FR -->|audit log| LOG[(email_intake_log)]
 ```
 
-**Two phases:**
-- **Phase 1 (Human-in-the-Loop):** Parsed emails land in a draft queue. PMs review and approve before BlueFolder SR creation.
-- **Phase 2 (Auto-Creation):** Known store/category combinations skip the queue and create SRs automatically.
+**Pipeline:** Emails are polled from the mailbox, parsed, deduplicated, and submitted directly to BlueFolder as "New" SRs. PMs already review incoming "New" SRs as part of their normal workflow — no custom draft queue or approval UI needed.
+
+An `email_intake_log` table tracks every processed email for dedup and debugging.
 
 ### End-to-End Sequence
 
@@ -67,8 +67,7 @@ sequenceDiagram
     participant OL as Outlook
     participant MG as Microsoft Graph API
     participant FR as Fieldrunner API
-    participant DB as Database
-    participant PM as Project Manager
+    participant LOG as email_intake_log
     participant BF as BlueFolder API
 
     SN->>OL: Dispatch email to jobs@rodcoservices.com
@@ -76,16 +75,22 @@ sequenceDiagram
     FR->>MG: GET /messages?$filter=from eq '7elevenna@service-now.com'
     MG-->>FR: New email(s)
     FR->>FR: Parse email body → structured fields
-    FR->>DB: Check dedup (work order number)
+    FR->>LOG: Check dedup (work order number)
     alt New work order
-        FR->>DB: INSERT email_intake_drafts (status='pending_review')
-        Note over PM: Phase 1
-        PM->>FR: POST /email-intake/drafts/:id/approve
-        FR->>BF: serviceRequests/add.aspx
-        BF-->>FR: SR created (bluefolderId)
-        FR->>DB: UPDATE draft (status='created', bluefolderId)
+        Note over FR: Resolve store location
+        alt Store in cache
+            Note over FR: Use cached locationId
+        else Store not in cache
+            FR->>BF: customers/addLocation.aspx
+            BF-->>FR: new customerLocationId
+        end
+        FR->>BF: serviceRequests/add.aspx (with externalId for BF-side dedup)
+        BF-->>FR: serviceRequestId
+        FR->>LOG: INSERT (status='created', bluefolderId)
     else Duplicate
-        FR->>DB: UPDATE draft (status='duplicate')
+        FR->>LOG: INSERT (status='duplicate')
+    else Parse failure
+        FR->>LOG: INSERT (status='parse_error', raw email body)
     end
 ```
 
@@ -104,20 +109,31 @@ Subject: 7-Eleven Priority 1 - Critical Work Order FWKD11021610 / INC23544260
 Work Order FWKD11021610 has been submitted with the following details:
 
 Number: FWKD11021610
+
 Incident: INC23544260
 
 Store Location: 7-ELEVEN STORE - 23655
+
 Store Address: 920 BOULEVARD,SEASIDE HEIGHTS,NJ,US,087512128
+
 AFM: Terry Mcgovern
+
 Email: Terry.McGovern@7-11.com
+
 Priority: 1 - Critical
+
 State: Open
+
 Functional Status: Dispatched
 
 Line of Service: EMS
+
 Business Service: EMS
+
 Category: EMS GENERATED ALARM|EMS
+
 Sub Category: NO COMM HVAC-1
+
 Service Provider: Rodco
 
 Order Summary: STORE COMPLAINT: "Store temp is very very cold at night..."
@@ -153,15 +169,15 @@ Ref:MSG631642386_4OR0HeJ7bbArTKhzL6
 
 ### Validated Across Samples
 
-| Sample | Work Order | Priority | Service Type | State |
-|--------|-----------|----------|-------------|-------|
-| 1 | FWKD11021610 | 1 - Critical | EMS / HVAC | NJ |
-| 2 | FWKD11015792 | 2 - Emergency | General Maintenance / Front door | NJ |
-| 3 | FWKD11037865 | 1 - Critical | Plumbing / Toilet | NY |
-| 4 | FWKD11040661 | 1 - Critical | (body truncated) | NY |
-| 5 | FWKD11034665 | 1 - Critical | EMS / HVAC / Ducts | NJ |
+| Sample | Work Order | Priority | Service Type | Location | State |
+|--------|-----------|----------|-------------|----------|-------|
+| 1 | FWKD11021610 | 1 - Critical | EMS / HVAC | 7-ELEVEN STORE - 23655 | NJ |
+| 2 | FWKD11015792 | 2 - Emergency | General Maintenance / Front door | 7-ELEVEN STORE - 37091 | NJ |
+| 3 | FWKD11037865 | 1 - Critical | Plumbing / Toilet | BCP STORE - 35090 | NY |
+| 4 | FWKD11040661 | 1 - Critical | Plumbing / Floor Drain | 7-ELEVEN STORE - 35103 | NY |
+| 5 | FWKD11034665 | 1 - Critical | EMS / HVAC / Ducts | 7-ELEVEN STORE - 35033 | NJ |
 
-Template is **consistent across all priority levels, service types, and geographies**.
+Template is **consistent across all priority levels, service types, and geographies**. Note that store 35090 uses brand "BCP" instead of "7-ELEVEN" — the store number format is the same.
 
 ## Microsoft Graph Integration
 
@@ -268,28 +284,32 @@ const PATTERNS = {
 
 ### Deduplication
 
-Dedup by **work order number** (`FWKD\d{8}`). Before inserting a draft:
+**Two layers of dedup:**
+
+1. **Fieldrunner-side:** Check `email_intake_log` before calling BlueFolder.
 
 ```sql
-SELECT id FROM email_intake_drafts
+SELECT id FROM email_intake_log
 WHERE work_order_number = :workOrderNumber
-  AND organization_id = :orgId;
+  AND organization_id = :orgId
+  AND status = 'created';
 ```
 
-If a match exists, skip insertion and log. The `Ref:MSG...` reference ID provides a secondary dedup key if needed.
+If a match exists, log as `duplicate` and skip.
+
+2. **BlueFolder-side:** The `externalId` field on the SR is set to the work order number. BF enforces uniqueness — if the same `externalId` is submitted twice, the API returns an error. This is defense-in-depth against race conditions or log corruption.
 
 ### Validation Rules
 
 | Check | Action on Failure |
 |-------|-------------------|
 | `Service Provider` is not `Rodco` | Skip — not our work order |
-| Work order number missing | Flag as `parse_error`, store raw email for manual review |
-| Store number not found in location mapping | Flag as `needs_mapping`, create draft with `store_number_unresolved = true` |
-| Any required field missing | Create draft with `parse_warnings` array noting missing fields |
+| Work order number missing | Log as `parse_error`, store raw email body for debugging |
+| Any required field missing | Still create SR with available fields, log warnings |
 
 ## BlueFolder SR Creation
 
-When a draft is approved (Phase 1) or auto-approved (Phase 2), create the SR via BlueFolder's XML API.
+Parsed emails are submitted directly to BlueFolder via `serviceRequests/add.aspx`. The SR is created in "New" status — PMs review incoming "New" SRs as part of their normal workflow.
 
 ### API Call
 
@@ -301,24 +321,139 @@ Content-Type: application/xml
 
 ### Field Mapping: Email → BlueFolder
 
-| Email Field | BlueFolder XML Field | Transform |
-|-------------|---------------------|-----------|
-| Work Order Number | `referenceNo` | Direct (`FWKD11021610`) |
-| Incident Number | `customField_IncidentNumber` | Direct (`INC23544260`) |
-| Store Number | `customerLocationId` | Lookup via `store_location_mapping` table |
-| Priority | `priority` | Map: `1 - Critical` → `1`, `2 - Emergency` → `2` |
-| Line of Service | `type` | Direct or mapped to BF types |
-| Category + Sub Category | Part of `description` | Prepend to description |
-| Order Summary | `description` | `"{Category} / {SubCategory}: {OrderSummary}"` |
-| Order Description | `detailedDescription` | Full multi-line text |
-| AFM Name + Email | `customField_AFM` | `"{name} ({email})"` |
-| Store Address | (resolved via `customerLocationId`) | Not sent — BF has it |
-| `"ServiceNow"` | `sourceName` | Static value |
-| Work Order Number | `sourceId` | Same as `referenceNo` |
+| Email Field | BlueFolder XML Field | Limit | Transform |
+|-------------|---------------------|-------|-----------|
+| Work Order Number | `externalId` | unique | `FWKD11021610` — BF enforces uniqueness, gives us server-side dedup |
+| Work Order Number | `referenceNo` | 50 chars | Direct (`FWKD11021610`) |
+| Work Order Number | `sourceId` | 50 chars | Same as `referenceNo` |
+| `"ServiceNow"` | `sourceName` | 50 chars | Static value |
+| Priority | `priority` | 50 chars | String, pass as-is: `"1 - Critical"` |
+| Line of Service | `type` | 50 chars | Direct: `"EMS"`, `"Plumbing - General"`, etc. |
+| Order Summary | `description` | **100 chars** | Truncated: `"{LineOfService}: {OrderSummary}"` (see note) |
+| Order Description + metadata | `detailedDescription` | no limit | Full description + appended metadata block (see below) |
+| Store Number | `customerLocationId` | numeric | Lookup or create (see Store Location Resolution) |
+| `false` | `notifyCustomer` | boolean | Prevent BF from emailing the 7-Eleven contact |
+
+**`description` 100-char limit:** BlueFolder's `description` field is capped at 100 characters. The full category/subcategory/summary often exceeds this. Strategy: use `"{LineOfService}: {OrderSummary}"` truncated to 100 chars. The full category, subcategory, and untruncated summary are preserved in `detailedDescription`.
+
+### Store Location Resolution
+
+Every email contains the store name and full address (already paired by 7-Eleven on their side). BlueFolder requires a numeric `customerLocationId` on the SR — and provides both a **Customer Locations API** for creating locations and a **Customers API** (`customers/get.aspx`) that returns all existing locations for a customer.
+
+**Resolution flow:**
+
+```mermaid
+flowchart TD
+    EMAIL[Parse store number from email] --> CACHE{Store in cache?}
+    CACHE -->|Yes| USE[Use cached customerLocationId]
+    CACHE -->|No| CREATE[Create via customers/addLocation.aspx]
+    CREATE --> RESP[Response: new customerLocationId]
+    RESP --> ADD_CACHE[Add to cache]
+    ADD_CACHE --> USE
+    USE --> SR[serviceRequests/add.aspx]
+```
+
+1. Parse store number from `Store Location` (e.g., `23655` from `7-ELEVEN STORE - 23655`)
+2. Parse address components from `Store Address` (comma-separated: `street,city,state,country,zip`)
+3. Look up `customerLocationId` in the in-memory cache
+4. **If found:** Use the existing `customerLocationId`
+5. **If not found:** Create the location via `customers/addLocation.aspx`, cache the returned ID
+
+Every email can be fully resolved — no unresolved locations, no PM manual fixup needed.
+
+#### Building the Location Cache
+
+Call `customers/get.aspx` with 7-Eleven's customer ID. The response includes **all locations inline**:
+
+```
+POST https://app.bluefolder.com/api/2.0/customers/get.aspx
+```
+
+```xml
+<request>
+  <customerId>38508963</customerId>
+</request>
+```
+
+Response (truncated):
+
+```xml
+<response status="ok">
+  <customer>
+    <customerId>38508963</customerId>
+    <customerName>Seven Eleven</customerName>
+    <locations>
+      <location>
+        <locationId>12345</locationId>
+        <locationName>7-ELEVEN STORE - 23655</locationName>
+        <addressStreet>920 BOULEVARD</addressStreet>
+        <addressCity>SEASIDE HEIGHTS</addressCity>
+        <addressState>NJ</addressState>
+        <addressPostalCode>08751</addressPostalCode>
+      </location>
+      <location>
+        <locationId>12346</locationId>
+        <locationName>7-ELEVEN STORE - 35033</locationName>
+        <!-- ... -->
+      </location>
+      <!-- all locations -->
+    </locations>
+  </customer>
+</response>
+```
+
+Parse each `<location>` to build `Map<string, number>` (store number → `locationId`). Refresh on startup and periodically (e.g., daily). One API call gives us the complete mapping.
+
+#### Creating a New Location
+
+When a store number isn't in the cache:
+
+```
+POST https://app.bluefolder.com/api/2.0/customers/addLocation.aspx
+```
+
+```xml
+<request>
+  <customerLocationAdd>
+    <customerId>38508963</customerId>
+    <locationName>7-ELEVEN STORE - 23655</locationName>
+    <addressStreet>920 BOULEVARD</addressStreet>
+    <addressCity>SEASIDE HEIGHTS</addressCity>
+    <addressState>NJ</addressState>
+    <addressCountry>US</addressCountry>
+    <addressPostalCode>08751</addressPostalCode>
+  </customerLocationAdd>
+</request>
+```
+
+Response returns the new `customerLocationId`. Add it to the cache immediately.
+
+**BF field limits for locations:**
+
+| Field | Limit | Example |
+|-------|-------|---------|
+| `locationName` | 50 chars | `7-ELEVEN STORE - 23655` (23 chars) |
+| `addressStreet` | 250 chars | `920 BOULEVARD` |
+| `addressCity` | 25 chars | `SEASIDE HEIGHTS` (15 chars) |
+| `addressState` | 25 chars | `NJ` |
+| `addressCountry` | 25 chars | `US` |
+| `addressPostalCode` | 10 chars | `08751` |
+
+#### Address Parsing
+
+The `Store Address` field is comma-separated: `street,city,state,country,zip`.
+
+```typescript
+// "920 BOULEVARD,SEASIDE HEIGHTS,NJ,US,087512128"
+const [street, city, state, country, rawZip] = storeAddress.split(',').map(s => s.trim());
+const zip = rawZip.substring(0, 5); // Normalize ZIP+4 (087512128 → 08751)
+```
+
+**Zip code note:** Some zips include the ZIP+4 without a hyphen (e.g., `087512128` = `08751-2128`). Normalizing to 5-digit avoids creating duplicate locations for the same store.
 
 ### BlueFolder Customer Reference
 
-7-Eleven in BlueFolder: `customerId: 38508963`. The SR must reference both the customer and the resolved `customerLocationId` (see Store Location Mapping section).
+7-Eleven in BlueFolder: `customerId: 38508963`.
 
 ### Request XML
 
@@ -327,194 +462,84 @@ Content-Type: application/xml
   <serviceRequestAdd>
     <customerId>38508963</customerId>
     <customerLocationId>{resolved_location_id}</customerLocationId>
-    <description>EMS GENERATED ALARM|EMS / NO COMM HVAC-1: STORE COMPLAINT: "Store temp is very very cold..."</description>
-    <detailedDescription>STORE COMPLAINT: "Store temp is very very cold at night..."
+    <externalId>FWKD11021610</externalId>
+    <description>EMS: STORE COMPLAINT: "Store temp is very very cold at night customers and employees</description>
+    <detailedDescription>STORE COMPLAINT: "Store temp is very very cold at night customers and employees are complaining. Very cold."
 
-REMOTE FINDINGS: -There's no communication with the RTU1...
+REMOTE FINDINGS: -There's no communication with the RTU1 (IO/flex board), so all operations are unknown. Please make sure the unit is mechanically sound, then work with TUTENLABS to restore comms.
+
+*An EMS specialist tech is required to perform this task, someone familiar enough with the subject and the ALC controller boards.*
+
+TECHNICIANS: Please contact Tutenlabs (855-298-7617) while on site to verify unit operation and validate store conditions align with EMS readings and controls.
 
 ---
-Work Order: FWKD11021610
+ServiceNow Work Order: FWKD11021610
 Incident: INC23544260
-AFM: Terry Mcgovern (Terry.McGovern@7-11.com)
 Store: 7-ELEVEN STORE - 23655
+Address: 920 BOULEVARD, SEASIDE HEIGHTS, NJ, US, 08751
+AFM: Terry Mcgovern (Terry.McGovern@7-11.com)
 Priority: 1 - Critical
+Category: EMS GENERATED ALARM|EMS / NO COMM HVAC-1
     </detailedDescription>
-    <priority>1</priority>
+    <priority>1 - Critical</priority>
     <type>EMS</type>
     <referenceNo>FWKD11021610</referenceNo>
+    <notifyCustomer>false</notifyCustomer>
     <sourceName>ServiceNow</sourceName>
     <sourceId>FWKD11021610</sourceId>
   </serviceRequestAdd>
 </request>
 ```
 
-## Human-in-the-Loop Review (Phase 1)
+**Key details:**
+- `externalId` set to the work order number — BF enforces uniqueness, so duplicate submissions are rejected at the API level (defense-in-depth on top of our `email_intake_log` dedup)
+- `description` truncated to 100 chars (`"{LineOfService}: {OrderSummary}"`)
+- `detailedDescription` contains the full untruncated order description plus a metadata block (after `---`) with all ServiceNow fields for reference
+- `notifyCustomer` set to `false` to prevent BF from emailing the 7-Eleven contact
+- `priority` passed as the full string from the email (BF accepts any string up to 50 chars)
 
-Phase 1 requires PM approval before any SR is created in BlueFolder. This provides a safety net while the parser is validated against real-world email variations.
+## Intake Log
 
-### Draft Queue Schema
+A lightweight log table tracks every processed email for dedup and debugging. No approval workflow — just an audit trail.
+
+### Schema
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `id` | uuid | no | `gen_random_uuid()` | PK |
 | `organization_id` | uuid FK | no | — | Org scoping |
-| `status` | text | no | `'pending_review'` | `pending_review`, `approved`, `rejected`, `created`, `duplicate`, `parse_error` |
-| `work_order_number` | text | no | — | `FWKD\d{8}`, unique per org |
+| `status` | text | no | — | `created`, `duplicate`, `parse_error`, `skipped` |
+| `work_order_number` | text | yes | — | `FWKD\d{8}`, null if parse failed |
 | `incident_number` | text | yes | — | `INC\d{8}` |
 | `store_number` | text | yes | — | Parsed from Store Location |
-| `store_location_name` | text | yes | — | Full location string |
-| `store_address` | text | yes | — | Raw address |
+| `store_address` | text | yes | — | Raw address from email |
 | `priority` | text | yes | — | e.g. `1 - Critical` |
 | `line_of_service` | text | yes | — | e.g. `EMS` |
 | `category` | text | yes | — | e.g. `EMS GENERATED ALARM\|EMS` |
-| `sub_category` | text | yes | — | e.g. `NO COMM HVAC-1` |
 | `order_summary` | text | yes | — | Short description |
-| `order_description` | text | yes | — | Full description |
-| `afm_name` | text | yes | — | Area Facilities Manager |
-| `afm_email` | text | yes | — | AFM email |
-| `service_provider` | text | yes | — | Should be `Rodco` |
-| `reference_id` | text | yes | — | `Ref:MSG...` thread ID |
-| `raw_email_subject` | text | yes | — | Original subject line |
-| `raw_email_body` | text | yes | — | Original email body |
-| `graph_message_id` | text | yes | — | Microsoft Graph message ID |
-| `resolved_customer_location_id` | integer | yes | — | Resolved BF location ID |
-| `parse_warnings` | jsonb | yes | — | Array of parser warning strings |
 | `bluefolder_id` | integer | yes | — | Set after BF creation |
-| `reviewed_by` | text | yes | — | Clerk user ID of approver |
-| `reviewed_at` | timestamptz | yes | — | When review occurred |
+| `customer_location_created` | boolean | no | `false` | Whether a new BF location was created |
+| `graph_message_id` | text | yes | — | Microsoft Graph message ID |
+| `raw_email_subject` | text | yes | — | For debugging |
+| `raw_email_body` | text | yes | — | For debugging (parse errors) |
+| `error_message` | text | yes | — | Parse error details |
 | `created_at` | timestamptz | no | `now()` | — |
-| `updated_at` | timestamptz | no | `now()` | — |
 
-**Unique constraint:** `uq_intake_draft_wo` on `(organization_id, work_order_number)`
+**Unique constraint:** `uq_intake_log_wo` on `(organization_id, work_order_number)` — prevents duplicate processing.
 
-### Draft Lifecycle
+## Phased Rollout
 
-```mermaid
-stateDiagram-v2
-    [*] --> pending_review: Email parsed
-    [*] --> duplicate: Work order already exists
-    [*] --> parse_error: Required fields missing
-    pending_review --> approved: PM approves
-    pending_review --> rejected: PM rejects
-    approved --> created: BlueFolder SR created
-    parse_error --> pending_review: Manual field correction
-```
+### Phase 1: Monitoring
 
-### API Endpoints
+- Pipeline runs, creates SRs directly in BlueFolder as "New"
+- PMs review in BlueFolder as normal — no new UI needed
+- Team monitors `email_intake_log` for parse errors or unexpected data
+- New store locations are auto-created in BlueFolder via `customers/addLocation.aspx`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/email-intake/drafts` | List drafts (filterable by status) |
-| `GET` | `/email-intake/drafts/:id` | Get draft detail |
-| `POST` | `/email-intake/drafts/:id/approve` | Approve → create BF SR |
-| `POST` | `/email-intake/drafts/:id/reject` | Reject with optional reason |
-| `PATCH` | `/email-intake/drafts/:id` | Edit parsed fields before approval |
-| `GET` | `/email-intake/stats` | Count by status |
+### Phase 2: Expand to Other Clients
 
-## Auto-Creation (Phase 2)
-
-Once the parser has been validated through Phase 1 and the store location mapping is complete, enable auto-creation for trusted combinations.
-
-### Auto-Approval Rules
-
-```typescript
-interface AutoApprovalRule {
-  storeNumberPattern?: string;   // regex, e.g. ".*" for all stores
-  lineOfService?: string;        // e.g. "Plumbing - General"
-  priorityLevel?: number;        // e.g. 1, 2
-  enabled: boolean;
-}
-```
-
-**Default rules (conservative start):**
-1. Store number is in the `store_location_mapping` table (resolved location exists)
-2. Service Provider is `Rodco`
-3. All required fields parsed successfully (no `parse_warnings`)
-
-When all conditions are met, the draft is created with `status = 'approved'` and immediately submitted to BlueFolder. The draft record is still created for audit purposes.
-
-### Confidence Scoring
-
-Each parsed draft receives a confidence score:
-
-| Factor | Points |
-|--------|--------|
-| All fields parsed | +40 |
-| Store number resolved to BF location | +30 |
-| Service Provider is `Rodco` | +15 |
-| Priority parsed correctly | +10 |
-| No parse warnings | +5 |
-| **Total** | **100** |
-
-Phase 2 auto-approves drafts scoring **≥ 85** (all fields parsed + store resolved + correct provider). Anything below goes to the review queue.
-
-## Store Location Mapping
-
-The email contains a store number (e.g., `23655`) that must be resolved to a BlueFolder `customerLocationId`. BlueFolder does not have a dedicated customer locations API endpoint — location data is always nested in SR responses.
-
-### Building the Initial Mapping
-
-```mermaid
-flowchart LR
-    DB[(service_requests)] -->|SELECT DISTINCT| MAP[store_location_mapping]
-    BF[BlueFolder API<br>serviceRequests/list.aspx] -->|historical SRs| DB
-```
-
-Seed the mapping from existing SR data:
-
-```sql
--- Extract store numbers from existing 7-Eleven SRs
--- customerLocationName format: "7-ELEVEN STORE - 23655"
-INSERT INTO store_location_mapping (organization_id, store_number, customer_location_id,
-  customer_location_name, street_address, city, state, postal_code, customer_id)
-SELECT DISTINCT ON (sr.customer_location_id)
-  sr.organization_id,
-  -- Parse store number from location name
-  regexp_replace(sr.customer_location_name, '.*- ', '') AS store_number,
-  sr.customer_location_id,
-  sr.customer_location_name,
-  sr.customer_location_street_address,
-  sr.customer_location_city,
-  sr.customer_location_state,
-  sr.customer_location_postal_code,
-  sr.customer_id
-FROM service_requests sr
-WHERE sr.customer_id = 38508963  -- Seven Eleven
-  AND sr.customer_location_id IS NOT NULL
-ON CONFLICT (organization_id, store_number) DO NOTHING;
-```
-
-### Mapping Table Schema
-
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| `id` | uuid | no | PK |
-| `organization_id` | uuid FK | no | Org scoping |
-| `store_number` | text | no | e.g. `23655` |
-| `customer_id` | integer | no | BF customer ID (`38508963`) |
-| `customer_location_id` | integer | no | BF location ID |
-| `customer_location_name` | text | yes | `7-ELEVEN STORE - 23655` |
-| `street_address` | text | yes | — |
-| `city` | text | yes | — |
-| `state` | text | yes | — |
-| `postal_code` | text | yes | — |
-| `created_at` | timestamptz | no | `now()` |
-
-**Unique constraint:** `uq_store_mapping` on `(organization_id, store_number)`
-
-### Handling Unknown Stores
-
-When an email arrives with a store number not in the mapping:
-
-1. Draft is created with `resolved_customer_location_id = NULL` and `parse_warnings = ['Store number 99999 not found in mapping']`
-2. PM reviews the draft, manually enters the `customerLocationId`, and approves
-3. On approval, the system adds the new store to `store_location_mapping` for future resolution
-
-### Keeping the Mapping Current
-
-- **On sync:** During regular BlueFolder sync, if a 7-Eleven SR contains a `customerLocationId` not in the mapping, insert it automatically
-- **On PM resolution:** When a PM manually resolves a store number during draft review, persist the mapping
-- **Admin endpoint:** `PUT /email-intake/store-mapping/:storeNumber` for manual corrections
+- Once validated with 7-Eleven, add parser templates for other clients (Cato Corporation, etc.)
+- Pluggable parser architecture: one parser per email template format
 
 ## Setup Requirements
 
@@ -564,20 +589,14 @@ EMAIL_POLL_INTERVAL_MS=60000
 ```
 apps/api/src/integrations/email-intake/
 ├── email-intake.module.ts
-├── email-intake.controller.ts        # REST endpoints for draft management
-├── email-intake.service.ts           # Draft CRUD, approval flow
+├── email-intake.service.ts           # Polling loop, dedup, BF creation
 ├── graph-mail.service.ts             # Microsoft Graph API client
 ├── email-parser.service.ts           # Regex parser for ServiceNow emails
-├── store-mapping.service.ts          # Store number → BF location resolution
-├── dto/
-│   ├── approve-draft.dto.ts
-│   └── update-draft.dto.ts
 ├── types/
 │   └── email-intake.types.ts
 └── __tests__/
-    ├── email-parser.service.spec.ts  # Parser unit tests with sample emails
-    ├── email-intake.service.spec.ts
-    └── store-mapping.service.spec.ts
+    ├── email-parser.service.spec.ts  # Parser unit tests with all 5 sample emails
+    └── email-intake.service.spec.ts
 ```
 
 ## Future Considerations

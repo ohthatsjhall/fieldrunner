@@ -61,6 +61,14 @@ export const queryKeys = {
       ['vendor-sourcing', orgId, 'results', bluefolderId] as const,
   },
 
+  analytics: {
+    /** Matches ALL analytics queries for this org. */
+    all: (orgId: string) => ['analytics', orgId] as const,
+
+    /** Dashboard aggregate data. */
+    dashboard: (orgId: string) => ['analytics', orgId, 'dashboard'] as const,
+  },
+
   organizationSettings: {
     /** Matches ALL org-settings queries for this org. */
     all: (orgId: string) => ['organization-settings', orgId] as const,

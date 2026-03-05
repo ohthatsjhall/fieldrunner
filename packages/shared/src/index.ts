@@ -30,6 +30,14 @@ export type {
   VendorSearchRequest,
 } from './vendor-sourcing.js';
 export type {
+  WeeklySnapshot,
+  MonthlyVolume,
+  MonthlyStageDuration,
+  MonthlyResolutionRate,
+  MonthlyTimeToClose,
+  AnalyticsDashboardResponse,
+} from './analytics.js';
+export type {
   ServiceRequestSummary,
   ServiceRequestDetail,
   ServiceRequestAssignment,

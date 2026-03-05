@@ -11,10 +11,7 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-  // Use Pino as the application logger
   app.useLogger(app.get(Logger));
-
-  // Security headers
   app.use(helmet());
 
   // CORS
