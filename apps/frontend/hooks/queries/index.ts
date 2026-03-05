@@ -34,6 +34,9 @@ export {
   useVendorSearch,
 } from './use-vendor-sourcing';
 
+// Analytics domain
+export { useAnalyticsDashboard } from './use-analytics';
+
 // Organization settings domain
 export {
   useBluefolderApiKey,
