@@ -10,6 +10,7 @@ import { DatabaseModule } from './core/database/database.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { BlueFolderModule } from './integrations/bluefolder/bluefolder.module';
 import { VendorSourcingModule } from './integrations/vendor-sourcing/vendor-sourcing.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { OrgModule } from './org/org.module';
 import { validate } from './config/env.validation';
 
@@ -74,6 +75,7 @@ import { validate } from './config/env.validation';
     OrgModule,
     BlueFolderModule,
     VendorSourcingModule,
+    AnalyticsModule,
   ],
   controllers: [],
   providers: [],
