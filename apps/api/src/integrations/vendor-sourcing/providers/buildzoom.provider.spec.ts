@@ -1,6 +1,7 @@
 import {
   BuildZoomProvider,
   buildSearchUrl,
+  resolveBuildZoomSlug,
   extractProfileUrls,
   parseMetadataDescription,
   mergeWithMetadata,
@@ -356,6 +357,70 @@ describe('scrapeProfiles', () => {
   });
 });
 
+// ── resolveBuildZoomSlug ─────────────────────────────────────────────
+
+describe('resolveBuildZoomSlug', () => {
+  it('should resolve exact category matches', () => {
+    expect(resolveBuildZoomSlug('electrical')).toBe('electricians');
+    expect(resolveBuildZoomSlug('plumbing')).toBe('plumbers');
+    expect(resolveBuildZoomSlug('roofing')).toBe('roofers');
+    expect(resolveBuildZoomSlug('HVAC')).toBe('hvac-contractors');
+    expect(resolveBuildZoomSlug('Paving & Asphalt')).toBe('paving-contractors');
+  });
+
+  it('should resolve aliases and variations', () => {
+    expect(resolveBuildZoomSlug('electrician')).toBe('electricians');
+    expect(resolveBuildZoomSlug('plumber')).toBe('plumbers');
+    expect(resolveBuildZoomSlug('roofer')).toBe('roofers');
+    expect(resolveBuildZoomSlug('painter')).toBe('painters');
+    expect(resolveBuildZoomSlug('carpenter')).toBe('carpenters');
+    expect(resolveBuildZoomSlug('landscaper')).toBe('landscapers');
+  });
+
+  it('should match when category name is contained in a longer query', () => {
+    expect(resolveBuildZoomSlug('asphalt patching repair')).toBe(
+      'paving-contractors',
+    );
+    expect(resolveBuildZoomSlug('concrete sidewalk repair')).toBe(
+      'concrete-contractors',
+    );
+    expect(resolveBuildZoomSlug('roof repair specialist')).toBe('roofers');
+    expect(resolveBuildZoomSlug('commercial painting service')).toBe(
+      'painters',
+    );
+  });
+
+  it('should match single keyword tokens from complex queries', () => {
+    expect(resolveBuildZoomSlug('parking lot pothole asphalt')).toBe(
+      'paving-contractors',
+    );
+    expect(resolveBuildZoomSlug('residential tile installation')).toBe(
+      'tile-contractors',
+    );
+  });
+
+  it('should return null for completely unrecognized trades', () => {
+    expect(resolveBuildZoomSlug('underwater basket weaving')).toBeNull();
+  });
+
+  it('should be case-insensitive', () => {
+    expect(resolveBuildZoomSlug('ELECTRICAL')).toBe('electricians');
+    expect(resolveBuildZoomSlug('Plumbing')).toBe('plumbers');
+    expect(resolveBuildZoomSlug('Paving & Asphalt')).toBe('paving-contractors');
+  });
+
+  it('should prefer longer/more-specific key matches', () => {
+    // "garage door" should match before "door"
+    expect(resolveBuildZoomSlug('garage door repair')).toBe(
+      'garage-door-contractors',
+    );
+    // "tree service" should match before just "tree"
+    expect(resolveBuildZoomSlug('tree service and removal')).toBe(
+      'tree-service',
+    );
+  });
+});
+
 // ── buildSearchUrl ──────────────────────────────────────────────────
 
 describe('buildSearchUrl', () => {
@@ -369,23 +434,23 @@ describe('buildSearchUrl', () => {
     expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/plumbers');
   });
 
-  it('should handle multi-word trades', () => {
+  it('should handle multi-word trades via slug map', () => {
     const url = buildSearchUrl('Los Angeles, CA', 'general contractor');
     expect(url).toBe(
       'https://www.buildzoom.com/los-angeles-ca/general-contractors',
     );
   });
 
-  it('should not pluralize abstract trade names ending in -tion', () => {
+  it('should resolve "Commercial Refrigeration" to hvac-contractors via keyword', () => {
     const url = buildSearchUrl('Blairs, VA', 'Commercial Refrigeration');
     expect(url).toBe(
-      'https://www.buildzoom.com/blairs-va/commercial-refrigeration',
+      'https://www.buildzoom.com/blairs-va/hvac-contractors',
     );
   });
 
-  it('should not pluralize trade names ending in -ing', () => {
+  it('should resolve "plumbing" via slug map', () => {
     const url = buildSearchUrl('Pittsburgh, PA', 'plumbing');
-    expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/plumbing');
+    expect(url).toBe('https://www.buildzoom.com/pittsburgh-pa/plumbers');
   });
 
   it('should map "Electrical" to "electricians" via known slug', () => {
@@ -404,6 +469,31 @@ describe('buildSearchUrl', () => {
     const url = buildSearchUrl('Pittsburgh, PA', 'General Maintenance');
     expect(url).toBe(
       'https://www.buildzoom.com/pittsburgh-pa/general-contractors',
+    );
+  });
+
+  it('should resolve Claude-generated category to valid slug', () => {
+    // Simulates real-world: Claude returns category "Paving & Asphalt"
+    const url = buildSearchUrl('Washington, DC', 'Paving & Asphalt');
+    expect(url).toBe(
+      'https://www.buildzoom.com/washington-dc/paving-contractors',
+    );
+  });
+
+  it('should resolve complex descriptive queries via keyword match', () => {
+    const url = buildSearchUrl(
+      'Washington, DC',
+      'asphalt patching repair parking lot contractor',
+    );
+    expect(url).toBe(
+      'https://www.buildzoom.com/washington-dc/paving-contractors',
+    );
+  });
+
+  it('should fall back to slugification for unknown trades', () => {
+    const url = buildSearchUrl('Pittsburgh, PA', 'zorblax technician');
+    expect(url).toBe(
+      'https://www.buildzoom.com/pittsburgh-pa/zorblax-technicians',
     );
   });
 });

@@ -80,7 +80,10 @@ export class BuildZoomProvider implements PlaceProvider {
 
     const trade = params.tradeCategory ?? params.query;
     const searchUrl = buildSearchUrl(params.locationName, trade);
-    this.logger.log(`BuildZoom search: "${trade}" in "${params.locationName}"`);
+    const resolvedSlug = resolveBuildZoomSlug(trade);
+    this.logger.log(
+      `BuildZoom search: trade="${trade}" → slug=${resolvedSlug ?? '(fallback slugify)'} → ${searchUrl}`,
+    );
 
     const result = await this.firecrawl.scrape(searchUrl, {
       formats: ['links'],
@@ -153,13 +156,177 @@ export class BuildZoomProvider implements PlaceProvider {
 
 // ── Helpers (exported for testing) ──────────────────────────────────────
 
-/** Maps trade category names to BuildZoom's URL slugs. */
+/**
+ * Maps trade category names, aliases, and keywords to BuildZoom's URL slugs.
+ * Keys should be lowercase. Multiple aliases can point to the same slug.
+ */
 const BUILDZOOM_SLUG_MAP: Record<string, string> = {
+  // Electrical
   electrical: 'electricians',
+  electrician: 'electricians',
+  electric: 'electricians',
+  wiring: 'electricians',
+  // HVAC
   hvac: 'hvac-contractors',
+  'hvac contractor': 'hvac-contractors',
+  'heating and cooling': 'hvac-contractors',
+  'heating & cooling': 'hvac-contractors',
+  heating: 'hvac-contractors',
+  'air conditioning': 'hvac-contractors',
+  // General
   'general maintenance': 'general-contractors',
+  'general contractor': 'general-contractors',
+  'general contracting': 'general-contractors',
+  handyman: 'handyman',
+  // Paving & Asphalt
   'paving & asphalt': 'paving-contractors',
+  'asphalt & paving': 'paving-contractors',
+  paving: 'paving-contractors',
+  asphalt: 'paving-contractors',
+  'asphalt repair': 'paving-contractors',
+  'parking lot': 'paving-contractors',
+  sealcoating: 'paving-contractors',
+  striping: 'paving-contractors',
+  // Plumbing
+  plumbing: 'plumbers',
+  plumber: 'plumbers',
+  // Roofing
+  roofing: 'roofers',
+  roofer: 'roofers',
+  'roof repair': 'roofers',
+  // Painting
+  painting: 'painters',
+  painter: 'painters',
+  // Concrete
+  concrete: 'concrete-contractors',
+  'concrete repair': 'concrete-contractors',
+  sidewalk: 'concrete-contractors',
+  // Masonry
+  masonry: 'masonry-contractors',
+  mason: 'masonry-contractors',
+  brickwork: 'masonry-contractors',
+  stonework: 'masonry-contractors',
+  // Fencing
+  fencing: 'fencing-contractors',
+  fence: 'fencing-contractors',
+  // Flooring
+  flooring: 'flooring-contractors',
+  'floor repair': 'flooring-contractors',
+  carpet: 'flooring-contractors',
+  // Carpentry
+  carpentry: 'carpenters',
+  carpenter: 'carpenters',
+  // Landscaping
+  landscaping: 'landscapers',
+  landscaper: 'landscapers',
+  'lawn care': 'landscapers',
+  // Siding
+  siding: 'siding-contractors',
+  // Demolition
+  demolition: 'demolition-contractors',
+  // Excavation
+  excavation: 'excavation-contractors',
+  grading: 'excavation-contractors',
+  // Insulation
+  insulation: 'insulation-contractors',
+  // Drywall
+  drywall: 'drywall-contractors',
+  // Waterproofing
+  waterproofing: 'waterproofing-contractors',
+  // Windows & Glass
+  window: 'window-contractors',
+  windows: 'window-contractors',
+  'window repair': 'window-contractors',
+  glass: 'glass-contractors',
+  glazing: 'glass-contractors',
+  glazier: 'glass-contractors',
+  // Garage doors
+  'garage door': 'garage-door-contractors',
+  'overhead door': 'garage-door-contractors',
+  // Tree service
+  'tree service': 'tree-service',
+  'tree removal': 'tree-service',
+  'tree trimming': 'tree-service',
+  arborist: 'tree-service',
+  // Pest control
+  'pest control': 'pest-control',
+  exterminator: 'pest-control',
+  // Fire protection
+  'fire protection': 'fire-protection',
+  'fire alarm': 'fire-protection',
+  sprinkler: 'fire-protection',
+  // Welding
+  welding: 'welders',
+  welder: 'welders',
+  // Tile
+  tile: 'tile-contractors',
+  tiling: 'tile-contractors',
+  // Cabinets
+  cabinet: 'cabinet-contractors',
+  cabinetry: 'cabinet-contractors',
+  // Chimney
+  chimney: 'chimney-contractors',
+  // Decks
+  deck: 'deck-contractors',
+  decking: 'deck-contractors',
+  // Pools
+  pool: 'pool-contractors',
+  'swimming pool': 'pool-contractors',
+  // Locks
+  locksmith: 'locksmiths',
+  // Elevator
+  elevator: 'elevator-contractors',
+  // Refrigeration
+  refrigeration: 'hvac-contractors',
+  // Appliance
+  'appliance repair': 'appliance-repair',
+  appliance: 'appliance-repair',
+  // Doors
+  door: 'door-contractors',
+  'door repair': 'door-contractors',
+  // Iron & steel
+  'iron work': 'iron-contractors',
+  ironwork: 'iron-contractors',
+  // Septic
+  septic: 'septic-contractors',
+  // Solar
+  solar: 'solar-contractors',
+  'solar panel': 'solar-contractors',
 };
+
+/**
+ * Resolves a trade query to a known BuildZoom URL slug.
+ *
+ * Matching strategy (first match wins):
+ * 1. Exact match on full query
+ * 2. Any map key contained within the query
+ * 3. Any single token from the query matches a map key
+ *
+ * Returns null if no match found — caller should fall back to slugification.
+ */
+export function resolveBuildZoomSlug(query: string): string | null {
+  const lower = query.toLowerCase().trim();
+
+  // 1. Exact match
+  if (BUILDZOOM_SLUG_MAP[lower]) return BUILDZOOM_SLUG_MAP[lower];
+
+  // 2. Check if any multi-word map key is contained in the query
+  //    (check longer keys first to prefer more specific matches)
+  const sortedKeys = Object.keys(BUILDZOOM_SLUG_MAP).sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const key of sortedKeys) {
+    if (lower.includes(key)) return BUILDZOOM_SLUG_MAP[key];
+  }
+
+  // 3. Tokenize the query and check individual words
+  const tokens = lower.split(/[\s&,/]+/).filter((t) => t.length > 2);
+  for (const token of tokens) {
+    if (BUILDZOOM_SLUG_MAP[token]) return BUILDZOOM_SLUG_MAP[token];
+  }
+
+  return null;
+}
 
 export function buildSearchUrl(locationName: string, query: string): string {
   const locationSlug = locationName
@@ -168,14 +335,13 @@ export function buildSearchUrl(locationName: string, query: string): string {
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
 
-  const knownSlug = BUILDZOOM_SLUG_MAP[query.toLowerCase()];
+  const knownSlug = resolveBuildZoomSlug(query);
   if (knownSlug) {
     return `https://www.buildzoom.com/${locationSlug}/${knownSlug}`;
   }
 
+  // Fallback: slugify the query directly (may produce invalid URLs)
   let tradeSlug = query.toLowerCase().replace(/\s+/g, '-');
-  // Only pluralize profession nouns (plumber→plumbers, contractor→contractors).
-  // Skip abstract/gerund trade names (refrigeration, plumbing, roofing, maintenance).
   const lastWord = query.toLowerCase().split(/\s+/).pop() ?? '';
   if (
     !tradeSlug.endsWith('s') &&
