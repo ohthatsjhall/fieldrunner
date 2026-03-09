@@ -12,6 +12,7 @@ import { BlueFolderModule } from '../bluefolder/bluefolder.module';
 import { FirecrawlModule } from '../firecrawl/firecrawl.module';
 import { EmailEnrichmentService } from './enrichment/email-enrichment.service';
 import { VendorAutoSearchListener } from './vendor-auto-search.listener';
+import { VendorBackfillService } from './vendor-backfill.service';
 
 @Module({
   imports: [OrganizationSettingsModule, BlueFolderModule, FirecrawlModule],
@@ -26,6 +27,7 @@ import { VendorAutoSearchListener } from './vendor-auto-search.listener';
     TradeCategoriesService,
     EmailEnrichmentService,
     VendorAutoSearchListener,
+    VendorBackfillService,
   ],
 })
 export class VendorSourcingModule {}

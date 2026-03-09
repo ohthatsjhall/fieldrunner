@@ -32,6 +32,8 @@ export {
   useVendorSearchSessions,
   useVendorSearchResults,
   useVendorSearch,
+  useVendorAssignment,
+  useAcceptVendor,
 } from './use-vendor-sourcing';
 
 // Analytics domain

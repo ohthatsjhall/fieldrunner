@@ -12,6 +12,7 @@ import type {
   VendorSearchRequest,
   VendorSearchResponse,
   VendorSearchSession,
+  VendorAssignment,
 } from '@fieldrunner/shared';
 
 import { queryKeys } from './query-keys';
@@ -64,9 +65,53 @@ export function useVendorSearchResults(bluefolderId: number) {
   });
 }
 
+/**
+ * Reads the current vendor assignment for a service request.
+ */
+export function useVendorAssignment(bluefolderId: number) {
+  const { orgId } = useAuth();
+
+  return useApiQuery<VendorAssignment | null>({
+    queryKey: queryKeys.vendorSourcing.assignment(orgId!, bluefolderId),
+    path: `/vendor-sourcing/assignment?serviceRequestBluefolderId=${bluefolderId}`,
+    enabled: !!orgId && bluefolderId > 0,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
+
+type AcceptVendorRequest = {
+  vendorId: string;
+  serviceRequestBluefolderId: number;
+  searchSessionId?: string;
+  rank?: number;
+  score?: number;
+};
+
+/**
+ * Accepts a vendor for a service request. On success, invalidates the
+ * assignment and results queries.
+ */
+export function useAcceptVendor(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<VendorAssignment, AcceptVendorRequest>({
+    path: '/vendor-sourcing/accept',
+    method: 'POST',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.assignment(orgId, bluefolderId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
+    },
+  });
+}
 
 /**
  * Triggers a vendor search (or re-search). On success, invalidates the

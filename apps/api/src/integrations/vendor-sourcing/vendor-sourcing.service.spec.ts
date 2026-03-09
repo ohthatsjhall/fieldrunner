@@ -526,6 +526,129 @@ describe('VendorSourcingService', () => {
     });
   });
 
+  describe('acceptVendor', () => {
+    it('should create a vendor assignment', async () => {
+      // SR lookup
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]);
+      // Vendor lookup
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'vendor-uuid',
+        name: 'Best Plumber',
+        phone: '+15125550001',
+        phoneRaw: '(512) 555-0001',
+        email: 'info@bestplumber.com',
+      }]);
+      // Insert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        organizationId: internalOrgId,
+        serviceRequestId: 'sr-uuid',
+        vendorId: 'vendor-uuid',
+        source: 'ui_accept',
+        vendorName: 'Best Plumber',
+      }]);
+
+      const result = await service.acceptVendor(clerkOrgId, {
+        vendorId: 'vendor-uuid',
+        serviceRequestBluefolderId: 2270,
+        searchSessionId: 'session-uuid',
+        rank: 1,
+        score: 85.5,
+      });
+
+      expect(mockSettings.resolveOrgId).toHaveBeenCalledWith(clerkOrgId);
+      expect(result.vendorName).toBe('Best Plumber');
+      expect(result.source).toBe('ui_accept');
+    });
+
+    it('should throw when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      await expect(
+        service.acceptVendor(clerkOrgId, {
+          vendorId: 'vendor-uuid',
+          serviceRequestBluefolderId: 9999,
+        }),
+      ).rejects.toThrow('Service request not found');
+    });
+
+    it('should throw when vendor not found', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([]); // Vendor not found
+
+      await expect(
+        service.acceptVendor(clerkOrgId, {
+          vendorId: 'nonexistent-uuid',
+          serviceRequestBluefolderId: 2270,
+        }),
+      ).rejects.toThrow('Vendor not found');
+    });
+
+    it('should upsert on re-accept for same SR', async () => {
+      // SR lookup
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]);
+      // Vendor lookup
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'vendor-uuid-2',
+        name: 'Quick Fix',
+        phone: '+15125550002',
+        phoneRaw: '(512) 555-0002',
+        email: null,
+      }]);
+      // Upsert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        vendorId: 'vendor-uuid-2',
+        vendorName: 'Quick Fix',
+        source: 'ui_accept',
+      }]);
+
+      const result = await service.acceptVendor(clerkOrgId, {
+        vendorId: 'vendor-uuid-2',
+        serviceRequestBluefolderId: 2270,
+        rank: 2,
+        score: 72.0,
+      });
+
+      expect(result.vendorName).toBe('Quick Fix');
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAssignment', () => {
+    it('should return null when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      const result = await service.getAssignment(clerkOrgId, 9999);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when no assignment exists', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([]); // No assignment
+
+      const result = await service.getAssignment(clerkOrgId, 2270);
+      expect(result).toBeNull();
+    });
+
+    it('should return the assignment when it exists', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        vendorId: 'vendor-uuid',
+        vendorName: 'Best Plumber',
+        source: 'ui_accept',
+        rank: 1,
+        score: '85.50',
+      }]); // Assignment found
+
+      const result = await service.getAssignment(clerkOrgId, 2270);
+      expect(result).not.toBeNull();
+      expect(result!.vendorName).toBe('Best Plumber');
+      expect(result!.source).toBe('ui_accept');
+    });
+  });
+
   describe('getResultsByServiceRequest', () => {
     it('should return null when SR not found', async () => {
       mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty

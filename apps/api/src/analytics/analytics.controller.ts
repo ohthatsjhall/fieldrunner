@@ -26,4 +26,21 @@ export class AnalyticsController {
   ) {
     return this.analyticsService.getDashboard(org.orgId, range);
   }
+
+  @Get('vendor-performance')
+  @Header('Cache-Control', 'private, max-age=120')
+  @ApiOperation({ summary: 'Get vendor performance analytics' })
+  @ApiQuery({
+    name: 'range',
+    required: false,
+    enum: ['7d', '1m', '6m', '1y', 'all'],
+    description: 'Time range filter',
+  })
+  @ApiResponse({ status: 200, description: 'Vendor performance analytics payload' })
+  getVendorPerformance(
+    @CurrentOrg() org: AuthOrganization,
+    @Query('range') range?: string,
+  ) {
+    return this.analyticsService.getVendorPerformance(org.orgId, range);
+  }
 }

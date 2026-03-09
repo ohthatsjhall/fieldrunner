@@ -7,6 +7,7 @@ import {
   vendorSearchSessions,
   vendorSearchResults,
   serviceRequests,
+  vendorAssignments,
 } from '../../core/database/schema';
 import { BlueFolderService } from '../bluefolder/bluefolder.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
@@ -197,7 +198,11 @@ export class VendorSourcingService {
           if (norm) seenPhones.add(norm);
         }
       } else {
-        this.logger.error('Google Places search failed', googleResult.reason);
+        const reason = googleResult.reason;
+        this.logger.error(
+          `Google Places search failed: ${reason instanceof Error ? reason.message : String(reason)}`,
+          reason instanceof Error ? reason.stack : undefined,
+        );
       }
 
       // Collect BuildZoom results (dedup by phone, geocode missing coords)
@@ -213,7 +218,11 @@ export class VendorSourcingService {
           allPlaces.push(...dedupedBz);
         }
       } else {
-        this.logger.warn('BuildZoom search failed', buildZoomResult.reason);
+        const reason = buildZoomResult.reason;
+        this.logger.warn(
+          `BuildZoom search failed: ${reason instanceof Error ? reason.message : String(reason)}`,
+          reason instanceof Error ? reason.stack : undefined,
+        );
       }
 
       // 5. Enrich emails from vendor websites (best-effort)
@@ -575,6 +584,124 @@ export class VendorSourcingService {
       .where(eq(vendorSourceRecords.vendorId, vendorId));
 
     return { vendor: vendorRows[0], sourceRecords };
+  }
+
+  async acceptVendor(
+    clerkOrgId: string,
+    dto: {
+      vendorId: string;
+      serviceRequestBluefolderId: number;
+      searchSessionId?: string;
+      rank?: number;
+      score?: number;
+    },
+  ) {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Look up internal SR ID
+    const srRows = await this.db
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(
+        and(
+          eq(serviceRequests.organizationId, organizationId),
+          eq(serviceRequests.bluefolderId, dto.serviceRequestBluefolderId),
+        ),
+      );
+
+    const serviceRequestId = srRows[0]?.id;
+    if (!serviceRequestId) {
+      throw new Error(
+        `Service request not found: bluefolderId=${dto.serviceRequestBluefolderId}`,
+      );
+    }
+
+    // Look up vendor
+    const vendorRows = await this.db
+      .select()
+      .from(vendors)
+      .where(
+        and(
+          eq(vendors.id, dto.vendorId),
+          eq(vendors.organizationId, organizationId),
+        ),
+      );
+
+    const vendor = vendorRows[0];
+    if (!vendor) {
+      throw new Error(`Vendor not found: ${dto.vendorId}`);
+    }
+
+    // Upsert assignment (one vendor per SR)
+    const [assignment] = await this.db
+      .insert(vendorAssignments)
+      .values({
+        organizationId,
+        serviceRequestId,
+        vendorId: dto.vendorId,
+        searchSessionId: dto.searchSessionId ?? null,
+        source: 'ui_accept',
+        vendorName: vendor.name,
+        vendorPhone: vendor.phone,
+        vendorPhoneRaw: vendor.phoneRaw,
+        vendorEmail: vendor.email,
+        rank: dto.rank ?? null,
+        score: dto.score != null ? String(dto.score) : null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          vendorAssignments.organizationId,
+          vendorAssignments.serviceRequestId,
+        ],
+        set: {
+          vendorId: dto.vendorId,
+          searchSessionId: dto.searchSessionId ?? null,
+          vendorName: vendor.name,
+          vendorPhone: vendor.phone,
+          vendorPhoneRaw: vendor.phoneRaw,
+          vendorEmail: vendor.email,
+          rank: dto.rank ?? null,
+          score: dto.score != null ? String(dto.score) : null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    this.logger.log(
+      `Vendor accepted: ${vendor.name} for SR #${dto.serviceRequestBluefolderId}`,
+    );
+
+    return assignment;
+  }
+
+  async getAssignment(clerkOrgId: string, bluefolderId: number) {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Look up internal SR ID
+    const srRows = await this.db
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(
+        and(
+          eq(serviceRequests.organizationId, organizationId),
+          eq(serviceRequests.bluefolderId, bluefolderId),
+        ),
+      );
+
+    const serviceRequestId = srRows[0]?.id;
+    if (!serviceRequestId) return null;
+
+    const rows = await this.db
+      .select()
+      .from(vendorAssignments)
+      .where(
+        and(
+          eq(vendorAssignments.organizationId, organizationId),
+          eq(vendorAssignments.serviceRequestId, serviceRequestId),
+        ),
+      );
+
+    return rows[0] ?? null;
   }
 
   private async upsertVendors(

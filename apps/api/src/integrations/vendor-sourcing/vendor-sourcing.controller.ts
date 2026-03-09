@@ -22,6 +22,7 @@ import { VendorSourcingService } from './vendor-sourcing.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
+import { AcceptVendorDto } from './dto/accept-vendor.dto';
 
 @ApiTags('Vendor Sourcing')
 @ApiBearerAuth()
@@ -54,6 +55,26 @@ export class VendorSourcingController {
       org.orgId,
       bluefolderId,
     );
+  }
+
+  @Post('accept')
+  @ApiOperation({ summary: 'Accept a vendor for a service request' })
+  @ApiResponse({ status: 201, description: 'Vendor assignment created' })
+  acceptVendor(
+    @CurrentOrg() org: AuthOrganization,
+    @Body() dto: AcceptVendorDto,
+  ) {
+    return this.vendorSourcingService.acceptVendor(org.orgId, dto);
+  }
+
+  @Get('assignment')
+  @ApiOperation({ summary: 'Get vendor assignment for a service request' })
+  @ApiResponse({ status: 200, description: 'Vendor assignment or null' })
+  getAssignment(
+    @CurrentOrg() org: AuthOrganization,
+    @Query('serviceRequestBluefolderId', ParseIntPipe) bluefolderId: number,
+  ) {
+    return this.vendorSourcingService.getAssignment(org.orgId, bluefolderId);
   }
 
   @Get('sessions')

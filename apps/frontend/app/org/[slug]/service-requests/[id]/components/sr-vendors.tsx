@@ -51,6 +51,7 @@ import type {
   ServiceRequestDetail,
   VendorCandidate,
   VendorSearchResponse,
+  VendorAssignment,
 } from '@fieldrunner/shared';
 
 const PAGE_SIZE = 5;
@@ -135,6 +136,9 @@ function AcceptVendorModal({
   sr,
   orgName,
   orgImageUrl,
+  sessionId,
+  onAcceptVendor,
+  acceptLoading,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -142,6 +146,9 @@ function AcceptVendorModal({
   sr: ServiceRequestDetail;
   orgName: string;
   orgImageUrl: string | null;
+  sessionId: string | null;
+  onAcceptVendor: (params: AcceptVendorParams) => void;
+  acceptLoading: boolean;
 }) {
   const defaultTo = candidate.email ?? '';
   const defaultSubject = `Work Order #${sr.serviceRequestId} - ${sr.customerLocationName} - ${orgName}`;
@@ -228,8 +235,27 @@ function AcceptVendorModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Discard
           </Button>
-          <Button onClick={() => onOpenChange(false)}>
-            Send
+          <Button
+            disabled={acceptLoading}
+            onClick={() => {
+              onAcceptVendor({
+                vendorId: candidate.vendorId,
+                serviceRequestBluefolderId: sr.serviceRequestId,
+                searchSessionId: sessionId ?? undefined,
+                rank: candidate.rank,
+                score: candidate.score,
+              });
+              onOpenChange(false);
+            }}
+          >
+            {acceptLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Sending&hellip;
+              </>
+            ) : (
+              'Send'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -272,21 +298,31 @@ function CategoryTags({ categories }: { categories: string[] }) {
 function VendorRow({
   candidate: c,
   onAccept,
+  isAccepted,
 }: {
   candidate: VendorCandidate;
   onAccept: (candidate: VendorCandidate) => void;
+  isAccepted: boolean;
 }) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
 
   return (
-      <TableRow className="cursor-default">
+      <TableRow className={cn('cursor-default', isAccepted && 'bg-green-50/50 dark:bg-green-950/20')}>
         <TableCell className="text-center font-mono text-sm text-muted-foreground">
           {c.rank}
         </TableCell>
 
         <TableCell>
           <div className="flex flex-col gap-1">
-            <span className="font-medium">{c.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{c.name}</span>
+              {isAccepted && (
+                <Badge variant="default" className="gap-1 bg-green-600 text-xs hover:bg-green-600">
+                  <UserCheck className="size-3" />
+                  Accepted
+                </Badge>
+              )}
+            </div>
             {c.address && (
               <span className="text-xs text-muted-foreground">{c.address}</span>
             )}
@@ -509,6 +545,14 @@ function ErrorBanner({ message }: { message: string }) {
 // SrVendors (main export)
 // ---------------------------------------------------------------------------
 
+type AcceptVendorParams = {
+  vendorId: string;
+  serviceRequestBluefolderId: number;
+  searchSessionId?: string;
+  rank?: number;
+  score?: number;
+};
+
 export function SrVendors({
   sr,
   results,
@@ -516,6 +560,9 @@ export function SrVendors({
   onReSearch,
   reSearchLoading,
   reSearchError,
+  assignment,
+  onAcceptVendor,
+  acceptLoading,
 }: {
   sr: ServiceRequestDetail;
   results: VendorSearchResponse | null;
@@ -523,6 +570,9 @@ export function SrVendors({
   onReSearch: () => void;
   reSearchLoading: boolean;
   reSearchError: string | null;
+  assignment: VendorAssignment | null;
+  onAcceptVendor: (params: AcceptVendorParams) => void;
+  acceptLoading: boolean;
 }) {
   const { organization } = useOrganization();
   const orgName = organization?.name ?? 'Organization';
@@ -688,7 +738,12 @@ export function SrVendors({
               </TableHeader>
               <TableBody>
                 {visible.map((c) => (
-                  <VendorRow key={c.vendorId} candidate={c} onAccept={setSelectedCandidate} />
+                  <VendorRow
+                    key={c.vendorId}
+                    candidate={c}
+                    onAccept={setSelectedCandidate}
+                    isAccepted={assignment?.vendorId === c.vendorId}
+                  />
                 ))}
               </TableBody>
             </Table>
@@ -736,6 +791,9 @@ export function SrVendors({
           sr={sr}
           orgName={orgName}
           orgImageUrl={orgImageUrl}
+          sessionId={results?.sessionId ?? null}
+          onAcceptVendor={onAcceptVendor}
+          acceptLoading={acceptLoading}
         />
       )}
     </TooltipProvider>
