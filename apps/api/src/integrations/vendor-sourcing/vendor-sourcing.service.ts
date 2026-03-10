@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq, and, inArray, desc } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '../../core/database/database.module';
 import {
@@ -6,6 +6,7 @@ import {
   vendorSourceRecords,
   vendorSearchSessions,
   vendorSearchResults,
+  vendorContactAttempts,
   serviceRequests,
   vendorAssignments,
 } from '../../core/database/schema';
@@ -29,6 +30,8 @@ import { EMPTY_CREDENTIALS } from './scoring/scoring.types';
 import type {
   VendorSearchResponse,
   VendorCandidate,
+  ContactAttemptSummary,
+  ContactStatus,
   ValidEmail,
 } from '@fieldrunner/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -514,13 +517,43 @@ export class VendorSourcingService {
 
     const vendorMap = new Map(vendorRows.map((v) => [v.id, v]));
 
+    // Fetch contact attempts for all results
+    const resultIds = results.map((r) => r.id);
+    const attemptRows =
+      resultIds.length > 0
+        ? await this.db
+            .select()
+            .from(vendorContactAttempts)
+            .where(inArray(vendorContactAttempts.vendorSearchResultId, resultIds))
+        : [];
+
+    // Group attempts by vendorSearchResultId
+    const attemptsByResult = new Map<string, typeof attemptRows>();
+    for (const a of attemptRows) {
+      const list = attemptsByResult.get(a.vendorSearchResultId) ?? [];
+      list.push(a);
+      attemptsByResult.set(a.vendorSearchResultId, list);
+    }
+
     // Map DB rows to VendorCandidate[]
     const candidates: VendorCandidate[] = results
       .sort((a, b) => a.rank - b.rank)
       .map((r) => {
         const v = vendorMap.get(r.vendorId);
+        const attempts = attemptsByResult.get(r.id) ?? [];
+        const sortedAttempts = [...attempts].sort(
+          (a, b) => b.attemptedAt.getTime() - a.attemptedAt.getTime(),
+        );
+        const contactAttempts: ContactAttemptSummary[] = sortedAttempts.map((a) => ({
+          id: a.id,
+          status: a.status as ContactStatus,
+          notes: a.notes,
+          attemptedAt: a.attemptedAt.toISOString(),
+        }));
+
         return {
           vendorId: r.vendorId,
+          vendorSearchResultId: r.id,
           rank: r.rank,
           score: Number(r.score),
           name: v?.name ?? '',
@@ -543,6 +576,9 @@ export class VendorSourcingService {
             businessHours: toNumber(r.businessHoursScore),
             credential: toNumber(r.credentialScore),
           },
+          contactAttempts,
+          latestContactStatus: contactAttempts[0]?.status ?? null,
+          contactAttemptCount: contactAttempts.length,
         };
       });
 
@@ -556,6 +592,79 @@ export class VendorSourcingService {
       candidates,
       hasMore: false,
     };
+  }
+
+  async logContactAttempt(
+    clerkOrgId: string,
+    dto: {
+      vendorSearchResultId: string;
+      status: 'no_answer' | 'unavailable' | 'declined';
+      notes?: string;
+    },
+  ) {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Verify result belongs to org (join through session)
+    const rows = await this.db
+      .select({ id: vendorSearchResults.id })
+      .from(vendorSearchResults)
+      .innerJoin(
+        vendorSearchSessions,
+        eq(vendorSearchResults.searchSessionId, vendorSearchSessions.id),
+      )
+      .where(
+        and(
+          eq(vendorSearchResults.id, dto.vendorSearchResultId),
+          eq(vendorSearchSessions.organizationId, organizationId),
+        ),
+      );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Vendor search result not found');
+    }
+
+    const [attempt] = await this.db
+      .insert(vendorContactAttempts)
+      .values({
+        vendorSearchResultId: dto.vendorSearchResultId,
+        status: dto.status,
+        notes: dto.notes ?? null,
+      })
+      .returning();
+
+    return attempt;
+  }
+
+  async clearContactAttempts(
+    clerkOrgId: string,
+    vendorSearchResultId: string,
+  ) {
+    const organizationId = await this.settingsService.resolveOrgId(clerkOrgId);
+
+    // Verify result belongs to org
+    const rows = await this.db
+      .select({ id: vendorSearchResults.id })
+      .from(vendorSearchResults)
+      .innerJoin(
+        vendorSearchSessions,
+        eq(vendorSearchResults.searchSessionId, vendorSearchSessions.id),
+      )
+      .where(
+        and(
+          eq(vendorSearchResults.id, vendorSearchResultId),
+          eq(vendorSearchSessions.organizationId, organizationId),
+        ),
+      );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Vendor search result not found');
+    }
+
+    await this.db
+      .delete(vendorContactAttempts)
+      .where(eq(vendorContactAttempts.vendorSearchResultId, vendorSearchResultId));
+
+    return { cleared: true };
   }
 
   async listSessions(organizationId: string) {
@@ -997,6 +1106,7 @@ export class VendorSourcingService {
 
       return {
         vendorId: r.id,
+        vendorSearchResultId: '',
         rank: r.rank,
         score: r.scored.totalScore,
         name: p?.name ?? '',
@@ -1019,6 +1129,9 @@ export class VendorSourcingService {
           businessHours: r.scored.businessHoursScore,
           credential: r.scored.credentialScore,
         },
+        contactAttempts: [],
+        latestContactStatus: null,
+        contactAttemptCount: 0,
       };
     });
   }

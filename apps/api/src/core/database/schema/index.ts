@@ -17,3 +17,4 @@ export * from './vendor-source-records';
 export * from './vendor-search-sessions';
 export * from './vendor-search-results';
 export * from './vendor-assignments';
+export * from './vendor-contact-attempts';

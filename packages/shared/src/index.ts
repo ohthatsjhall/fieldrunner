@@ -25,8 +25,11 @@ export type {
   VendorAssignment,
   VendorAssignmentSource,
   VendorMatchConfidence,
+  ContactStatus,
+  VendorContactAttempt,
 } from './database.js';
 export type {
+  ContactAttemptSummary,
   VendorCandidate,
   VendorSearchStatus,
   VendorSearchResponse,

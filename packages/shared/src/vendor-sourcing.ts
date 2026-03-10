@@ -1,7 +1,15 @@
-import type { ValidEmail } from './database.js';
+import type { ContactStatus, ValidEmail } from './database.js';
+
+export type ContactAttemptSummary = {
+  id: string;
+  status: ContactStatus;
+  notes: string | null;
+  attemptedAt: string;
+};
 
 export type VendorCandidate = {
   vendorId: string;
+  vendorSearchResultId: string;
   rank: number;
   score: number;
   name: string;
@@ -24,6 +32,9 @@ export type VendorCandidate = {
     businessHours: number | null;
     credential: number | null;
   };
+  contactAttempts: ContactAttemptSummary[];
+  latestContactStatus: ContactStatus | null;
+  contactAttemptCount: number;
 };
 
 export type VendorSearchStatus = 'pending' | 'in_progress' | 'completed' | 'failed';

@@ -325,3 +325,14 @@ export type VendorSearchResult = {
   distanceMeters: string | null;
   createdAt: Date;
 };
+
+export type ContactStatus = 'no_answer' | 'unavailable' | 'declined';
+
+export type VendorContactAttempt = {
+  id: string;
+  vendorSearchResultId: string;
+  status: ContactStatus;
+  notes: string | null;
+  attemptedAt: Date;
+  createdAt: Date;
+};

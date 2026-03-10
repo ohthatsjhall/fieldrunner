@@ -9,6 +9,7 @@ import {
 import { relations } from 'drizzle-orm';
 import { vendorSearchSessions } from './vendor-search-sessions';
 import { vendors } from './vendors';
+import { vendorContactAttempts } from './vendor-contact-attempts';
 
 export const vendorSearchResults = pgTable(
   'vendor_search_results',
@@ -50,7 +51,7 @@ export const vendorSearchResults = pgTable(
 
 export const vendorSearchResultsRelations = relations(
   vendorSearchResults,
-  ({ one }) => ({
+  ({ one, many }) => ({
     searchSession: one(vendorSearchSessions, {
       fields: [vendorSearchResults.searchSessionId],
       references: [vendorSearchSessions.id],
@@ -59,5 +60,6 @@ export const vendorSearchResultsRelations = relations(
       fields: [vendorSearchResults.vendorId],
       references: [vendors.id],
     }),
+    contactAttempts: many(vendorContactAttempts),
   }),
 );

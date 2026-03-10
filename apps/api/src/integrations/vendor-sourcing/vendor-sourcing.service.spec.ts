@@ -247,6 +247,7 @@ describe('VendorSourcingService', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnValue([]),
+      innerJoin: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn().mockResolvedValue([{ id: 'session-uuid' }]),
@@ -254,6 +255,7 @@ describe('VendorSourcingService', () => {
       onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       set: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -720,6 +722,7 @@ describe('VendorSourcingService', () => {
       // Results lookup
       mockDb.where.mockResolvedValueOnce([
         {
+          id: 'result-1',
           vendorId: 'v-1',
           rank: 2,
           score: '75.5',
@@ -732,6 +735,7 @@ describe('VendorSourcingService', () => {
           credentialScore: '40',
         },
         {
+          id: 'result-2',
           vendorId: 'v-2',
           rank: 1,
           score: '85.0',
@@ -773,6 +777,8 @@ describe('VendorSourcingService', () => {
           googlePlaceId: null,
         },
       ]);
+      // Contact attempts lookup (empty)
+      mockDb.where.mockResolvedValueOnce([]);
 
       const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
 
@@ -785,6 +791,11 @@ describe('VendorSourcingService', () => {
       // Scores should be numbers, not strings
       expect(typeof result!.candidates[0].score).toBe('number');
       expect(result!.candidates[0].score).toBe(85.0);
+      // Contact attempt fields should be present with defaults
+      expect(result!.candidates[0].contactAttempts).toEqual([]);
+      expect(result!.candidates[0].latestContactStatus).toBeNull();
+      expect(result!.candidates[0].contactAttemptCount).toBe(0);
+      expect(result!.candidates[0].vendorSearchResultId).toBe('result-2');
     });
 
     it('should handle session with zero results gracefully', async () => {
@@ -813,6 +824,67 @@ describe('VendorSourcingService', () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe('completed');
       expect(result!.candidates).toEqual([]);
+    });
+  });
+
+  describe('logContactAttempt', () => {
+    it('should insert a contact attempt and return it', async () => {
+      // Ownership check (select → from → innerJoin → where)
+      mockDb.where.mockResolvedValueOnce([{ id: 'result-uuid' }]);
+      // Insert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'attempt-uuid',
+        vendorSearchResultId: 'result-uuid',
+        status: 'no_answer',
+        notes: 'Left voicemail',
+        attemptedAt: new Date('2026-03-10T12:00:00Z'),
+        createdAt: new Date('2026-03-10T12:00:00Z'),
+      }]);
+
+      const result = await service.logContactAttempt(clerkOrgId, {
+        vendorSearchResultId: 'result-uuid',
+        status: 'no_answer',
+        notes: 'Left voicemail',
+      });
+
+      expect(mockSettings.resolveOrgId).toHaveBeenCalledWith(clerkOrgId);
+      expect(result.status).toBe('no_answer');
+      expect(result.notes).toBe('Left voicemail');
+    });
+
+    it('should throw NotFoundException when result does not belong to org', async () => {
+      // Ownership check returns empty
+      mockDb.where.mockResolvedValueOnce([]);
+
+      await expect(
+        service.logContactAttempt(clerkOrgId, {
+          vendorSearchResultId: 'nonexistent-uuid',
+          status: 'declined',
+        }),
+      ).rejects.toThrow('Vendor search result not found');
+    });
+  });
+
+  describe('clearContactAttempts', () => {
+    it('should delete all attempts and return cleared', async () => {
+      // Ownership check
+      mockDb.where.mockResolvedValueOnce([{ id: 'result-uuid' }]);
+      // Delete where (returns this from delete chain)
+      mockDb.where.mockResolvedValueOnce(undefined);
+
+      const result = await service.clearContactAttempts(clerkOrgId, 'result-uuid');
+
+      expect(result).toEqual({ cleared: true });
+      expect(mockDb.delete).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when result does not belong to org', async () => {
+      // Ownership check returns empty
+      mockDb.where.mockResolvedValueOnce([]);
+
+      await expect(
+        service.clearContactAttempts(clerkOrgId, 'nonexistent-uuid'),
+      ).rejects.toThrow('Vendor search result not found');
     });
   });
 });
