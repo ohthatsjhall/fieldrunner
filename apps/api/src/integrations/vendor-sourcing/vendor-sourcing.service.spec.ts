@@ -247,6 +247,7 @@ describe('VendorSourcingService', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnValue([]),
+      innerJoin: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn().mockResolvedValue([{ id: 'session-uuid' }]),
@@ -254,6 +255,7 @@ describe('VendorSourcingService', () => {
       onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       set: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -526,6 +528,129 @@ describe('VendorSourcingService', () => {
     });
   });
 
+  describe('acceptVendor', () => {
+    it('should create a vendor assignment', async () => {
+      // SR lookup
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]);
+      // Vendor lookup
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'vendor-uuid',
+        name: 'Best Plumber',
+        phone: '+15125550001',
+        phoneRaw: '(512) 555-0001',
+        email: 'info@bestplumber.com',
+      }]);
+      // Insert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        organizationId: internalOrgId,
+        serviceRequestId: 'sr-uuid',
+        vendorId: 'vendor-uuid',
+        source: 'ui_accept',
+        vendorName: 'Best Plumber',
+      }]);
+
+      const result = await service.acceptVendor(clerkOrgId, {
+        vendorId: 'vendor-uuid',
+        serviceRequestBluefolderId: 2270,
+        searchSessionId: 'session-uuid',
+        rank: 1,
+        score: 85.5,
+      });
+
+      expect(mockSettings.resolveOrgId).toHaveBeenCalledWith(clerkOrgId);
+      expect(result.vendorName).toBe('Best Plumber');
+      expect(result.source).toBe('ui_accept');
+    });
+
+    it('should throw when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      await expect(
+        service.acceptVendor(clerkOrgId, {
+          vendorId: 'vendor-uuid',
+          serviceRequestBluefolderId: 9999,
+        }),
+      ).rejects.toThrow('Service request not found');
+    });
+
+    it('should throw when vendor not found', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([]); // Vendor not found
+
+      await expect(
+        service.acceptVendor(clerkOrgId, {
+          vendorId: 'nonexistent-uuid',
+          serviceRequestBluefolderId: 2270,
+        }),
+      ).rejects.toThrow('Vendor not found');
+    });
+
+    it('should upsert on re-accept for same SR', async () => {
+      // SR lookup
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]);
+      // Vendor lookup
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'vendor-uuid-2',
+        name: 'Quick Fix',
+        phone: '+15125550002',
+        phoneRaw: '(512) 555-0002',
+        email: null,
+      }]);
+      // Upsert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        vendorId: 'vendor-uuid-2',
+        vendorName: 'Quick Fix',
+        source: 'ui_accept',
+      }]);
+
+      const result = await service.acceptVendor(clerkOrgId, {
+        vendorId: 'vendor-uuid-2',
+        serviceRequestBluefolderId: 2270,
+        rank: 2,
+        score: 72.0,
+      });
+
+      expect(result.vendorName).toBe('Quick Fix');
+      expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAssignment', () => {
+    it('should return null when SR not found', async () => {
+      mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
+
+      const result = await service.getAssignment(clerkOrgId, 9999);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when no assignment exists', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([]); // No assignment
+
+      const result = await service.getAssignment(clerkOrgId, 2270);
+      expect(result).toBeNull();
+    });
+
+    it('should return the assignment when it exists', async () => {
+      mockDb.where.mockResolvedValueOnce([{ id: 'sr-uuid' }]); // SR found
+      mockDb.where.mockResolvedValueOnce([{
+        id: 'assignment-uuid',
+        vendorId: 'vendor-uuid',
+        vendorName: 'Best Plumber',
+        source: 'ui_accept',
+        rank: 1,
+        score: '85.50',
+      }]); // Assignment found
+
+      const result = await service.getAssignment(clerkOrgId, 2270);
+      expect(result).not.toBeNull();
+      expect(result!.vendorName).toBe('Best Plumber');
+      expect(result!.source).toBe('ui_accept');
+    });
+  });
+
   describe('getResultsByServiceRequest', () => {
     it('should return null when SR not found', async () => {
       mockDb.where.mockResolvedValueOnce([]); // SR lookup → empty
@@ -597,6 +722,7 @@ describe('VendorSourcingService', () => {
       // Results lookup
       mockDb.where.mockResolvedValueOnce([
         {
+          id: 'result-1',
           vendorId: 'v-1',
           rank: 2,
           score: '75.5',
@@ -609,6 +735,7 @@ describe('VendorSourcingService', () => {
           credentialScore: '40',
         },
         {
+          id: 'result-2',
           vendorId: 'v-2',
           rank: 1,
           score: '85.0',
@@ -650,6 +777,8 @@ describe('VendorSourcingService', () => {
           googlePlaceId: null,
         },
       ]);
+      // Contact attempts lookup (empty)
+      mockDb.where.mockResolvedValueOnce([]);
 
       const result = await service.getResultsByServiceRequest(clerkOrgId, 2270);
 
@@ -662,6 +791,11 @@ describe('VendorSourcingService', () => {
       // Scores should be numbers, not strings
       expect(typeof result!.candidates[0].score).toBe('number');
       expect(result!.candidates[0].score).toBe(85.0);
+      // Contact attempt fields should be present with defaults
+      expect(result!.candidates[0].contactAttempts).toEqual([]);
+      expect(result!.candidates[0].latestContactStatus).toBeNull();
+      expect(result!.candidates[0].contactAttemptCount).toBe(0);
+      expect(result!.candidates[0].vendorSearchResultId).toBe('result-2');
     });
 
     it('should handle session with zero results gracefully', async () => {
@@ -690,6 +824,67 @@ describe('VendorSourcingService', () => {
       expect(result).not.toBeNull();
       expect(result!.status).toBe('completed');
       expect(result!.candidates).toEqual([]);
+    });
+  });
+
+  describe('logContactAttempt', () => {
+    it('should insert a contact attempt and return it', async () => {
+      // Ownership check (select → from → innerJoin → where)
+      mockDb.where.mockResolvedValueOnce([{ id: 'result-uuid' }]);
+      // Insert returning
+      mockDb.returning.mockResolvedValueOnce([{
+        id: 'attempt-uuid',
+        vendorSearchResultId: 'result-uuid',
+        status: 'no_answer',
+        notes: 'Left voicemail',
+        attemptedAt: new Date('2026-03-10T12:00:00Z'),
+        createdAt: new Date('2026-03-10T12:00:00Z'),
+      }]);
+
+      const result = await service.logContactAttempt(clerkOrgId, {
+        vendorSearchResultId: 'result-uuid',
+        status: 'no_answer',
+        notes: 'Left voicemail',
+      });
+
+      expect(mockSettings.resolveOrgId).toHaveBeenCalledWith(clerkOrgId);
+      expect(result.status).toBe('no_answer');
+      expect(result.notes).toBe('Left voicemail');
+    });
+
+    it('should throw NotFoundException when result does not belong to org', async () => {
+      // Ownership check returns empty
+      mockDb.where.mockResolvedValueOnce([]);
+
+      await expect(
+        service.logContactAttempt(clerkOrgId, {
+          vendorSearchResultId: 'nonexistent-uuid',
+          status: 'declined',
+        }),
+      ).rejects.toThrow('Vendor search result not found');
+    });
+  });
+
+  describe('clearContactAttempts', () => {
+    it('should delete all attempts and return cleared', async () => {
+      // Ownership check
+      mockDb.where.mockResolvedValueOnce([{ id: 'result-uuid' }]);
+      // Delete where (returns this from delete chain)
+      mockDb.where.mockResolvedValueOnce(undefined);
+
+      const result = await service.clearContactAttempts(clerkOrgId, 'result-uuid');
+
+      expect(result).toEqual({ cleared: true });
+      expect(mockDb.delete).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when result does not belong to org', async () => {
+      // Ownership check returns empty
+      mockDb.where.mockResolvedValueOnce([]);
+
+      await expect(
+        service.clearContactAttempts(clerkOrgId, 'nonexistent-uuid'),
+      ).rejects.toThrow('Vendor search result not found');
     });
   });
 });

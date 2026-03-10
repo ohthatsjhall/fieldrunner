@@ -22,8 +22,14 @@ export type {
   VendorSourceRecord,
   VendorSearchSession,
   VendorSearchResult,
+  VendorAssignment,
+  VendorAssignmentSource,
+  VendorMatchConfidence,
+  ContactStatus,
+  VendorContactAttempt,
 } from './database.js';
 export type {
+  ContactAttemptSummary,
   VendorCandidate,
   VendorSearchStatus,
   VendorSearchResponse,
@@ -36,6 +42,11 @@ export type {
   MonthlyResolutionRate,
   MonthlyTimeToClose,
   AnalyticsDashboardResponse,
+  TopVendor,
+  RankWinRate,
+  CoverageRate,
+  VendorMonthlyTrend,
+  VendorPerformanceResponse,
 } from './analytics.js';
 export type {
   ServiceRequestSummary,

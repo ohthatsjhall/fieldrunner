@@ -59,6 +59,10 @@ export const queryKeys = {
     /** Cached results for a specific SR. */
     results: (orgId: string, bluefolderId: number) =>
       ['vendor-sourcing', orgId, 'results', bluefolderId] as const,
+
+    /** Current vendor assignment for a specific SR. */
+    assignment: (orgId: string, bluefolderId: number) =>
+      ['vendor-sourcing', orgId, 'assignment', bluefolderId] as const,
   },
 
   analytics: {

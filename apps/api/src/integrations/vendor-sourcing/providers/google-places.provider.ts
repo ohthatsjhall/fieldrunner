@@ -70,8 +70,9 @@ export class GooglePlacesProvider implements PlaceProvider {
     });
 
     if (!response.ok) {
+      const body = await response.text().catch(() => '');
       throw new Error(
-        `Google Places search failed: ${response.status} ${response.statusText}`,
+        `Google Places search failed: ${response.status} ${response.statusText} — ${body}`,
       );
     }
 

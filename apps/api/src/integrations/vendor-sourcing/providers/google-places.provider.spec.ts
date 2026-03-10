@@ -118,6 +118,7 @@ describe('GooglePlacesProvider', () => {
         ok: false,
         status: 403,
         statusText: 'Forbidden',
+        text: () => Promise.resolve('API key invalid'),
       });
 
       await expect(provider.search(defaultParams)).rejects.toThrow(

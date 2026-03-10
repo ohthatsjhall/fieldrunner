@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Header,
   Post,
@@ -22,6 +23,8 @@ import { VendorSourcingService } from './vendor-sourcing.service';
 import { TradeCategoriesService } from './trade-categories/trade-categories.service';
 import { OrganizationSettingsService } from '../../org/settings/settings.service';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
+import { AcceptVendorDto } from './dto/accept-vendor.dto';
+import { LogContactAttemptDto } from './dto/log-contact-attempt.dto';
 
 @ApiTags('Vendor Sourcing')
 @ApiBearerAuth()
@@ -54,6 +57,26 @@ export class VendorSourcingController {
       org.orgId,
       bluefolderId,
     );
+  }
+
+  @Post('accept')
+  @ApiOperation({ summary: 'Accept a vendor for a service request' })
+  @ApiResponse({ status: 201, description: 'Vendor assignment created' })
+  acceptVendor(
+    @CurrentOrg() org: AuthOrganization,
+    @Body() dto: AcceptVendorDto,
+  ) {
+    return this.vendorSourcingService.acceptVendor(org.orgId, dto);
+  }
+
+  @Get('assignment')
+  @ApiOperation({ summary: 'Get vendor assignment for a service request' })
+  @ApiResponse({ status: 200, description: 'Vendor assignment or null' })
+  getAssignment(
+    @CurrentOrg() org: AuthOrganization,
+    @Query('serviceRequestBluefolderId', ParseIntPipe) bluefolderId: number,
+  ) {
+    return this.vendorSourcingService.getAssignment(org.orgId, bluefolderId);
   }
 
   @Get('sessions')
@@ -120,5 +143,28 @@ export class VendorSourcingController {
     // Seed defaults first (idempotent)
     await this.tradeCategoriesService.seedDefaults(organizationId);
     return this.tradeCategoriesService.findAll(organizationId);
+  }
+
+  @Post('contact-attempt')
+  @ApiOperation({ summary: 'Log a contact attempt for a vendor search result' })
+  @ApiResponse({ status: 201, description: 'Contact attempt logged' })
+  logContactAttempt(
+    @CurrentOrg() org: AuthOrganization,
+    @Body() dto: LogContactAttemptDto,
+  ) {
+    return this.vendorSourcingService.logContactAttempt(org.orgId, dto);
+  }
+
+  @Delete('contact-attempt/:vendorSearchResultId')
+  @ApiOperation({ summary: 'Clear all contact attempts for a vendor search result' })
+  @ApiResponse({ status: 200, description: 'Contact attempts cleared' })
+  clearContactAttempts(
+    @CurrentOrg() org: AuthOrganization,
+    @Param('vendorSearchResultId', ParseUUIDPipe) vendorSearchResultId: string,
+  ) {
+    return this.vendorSourcingService.clearContactAttempts(
+      org.orgId,
+      vendorSearchResultId,
+    );
   }
 }

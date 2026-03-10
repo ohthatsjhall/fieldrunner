@@ -35,7 +35,7 @@ function findComponent(
   textType: 'long' | 'short' = 'short',
 ): string | null {
   if (!components) return null;
-  const comp = components.find((c) => c.types.includes(type));
+  const comp = components.find((c) => c.types?.includes(type));
   if (!comp) return null;
   return textType === 'short' ? comp.shortText : comp.longText;
 }

@@ -10,6 +10,10 @@
 - use context7 MCP for researching and finding the latest developer documentation.
 - The Clerk middleware file is `apps/frontend/proxy.ts` — **never rename it to `middleware.ts`**. This is the correct convention per Clerk docs.
 
+## Testing
+
+Run API tests with `cd apps/api && bun run test` (invokes **jest** via package.json script). **Never use `bun test` directly** — bun's native test runner does not emit decorator metadata (`emitDecoratorMetadata`), which breaks NestJS dependency injection (all injected services become `undefined`).
+
 ## Architecture
 
 Turborepo monorepo: `apps/api` (NestJS), `apps/frontend` (Next.js + Clerk), `packages/shared`.

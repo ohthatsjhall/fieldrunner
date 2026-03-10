@@ -287,6 +287,29 @@ export type VendorSearchSession = {
   updatedAt: Date;
 };
 
+export type VendorAssignmentSource = 'ui_accept' | 'bluefolder_backfill';
+
+export type VendorMatchConfidence = 'phone_exact' | 'name_fuzzy' | 'unmatched';
+
+export type VendorAssignment = {
+  id: string;
+  organizationId: string;
+  serviceRequestId: string;
+  vendorId: string | null;
+  searchSessionId: string | null;
+  source: VendorAssignmentSource;
+  vendorName: string;
+  vendorPhone: string | null;
+  vendorPhoneRaw: string | null;
+  vendorEmail: string | null;
+  rank: number | null;
+  score: string | null;
+  bfRawFieldValue: string | null;
+  matchConfidence: VendorMatchConfidence | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type VendorSearchResult = {
   id: string;
   searchSessionId: string;
@@ -300,5 +323,16 @@ export type VendorSearchResult = {
   businessHoursScore: string | null;
   credentialScore: string | null;
   distanceMeters: string | null;
+  createdAt: Date;
+};
+
+export type ContactStatus = 'no_answer' | 'unavailable' | 'declined';
+
+export type VendorContactAttempt = {
+  id: string;
+  vendorSearchResultId: string;
+  status: ContactStatus;
+  notes: string | null;
+  attemptedAt: Date;
   createdAt: Date;
 };

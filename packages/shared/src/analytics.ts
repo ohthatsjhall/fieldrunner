@@ -36,3 +36,40 @@ export interface AnalyticsDashboardResponse {
   resolutionRate: MonthlyResolutionRate[];
   timeToClose: MonthlyTimeToClose[];
 }
+
+// -- Vendor Performance Analytics --
+
+export interface TopVendor {
+  vendorName: string;
+  vendorId: string | null;
+  jobCount: number;
+  avgBillable: number | null;
+  totalBillable: number | null;
+}
+
+export interface RankWinRate {
+  rank: number;
+  count: number;
+  percentage: number;
+}
+
+export interface CoverageRate {
+  totalClosed: number;
+  withAssignment: number;
+  withoutAssignment: number;
+  coveragePercent: number;
+}
+
+export interface VendorMonthlyTrend {
+  month: string;
+  vendorName: string;
+  jobCount: number;
+  avgBillable: number | null;
+}
+
+export interface VendorPerformanceResponse {
+  topVendors: TopVendor[];
+  rankWinRates: RankWinRate[];
+  coverage: CoverageRate;
+  monthlyTrends: VendorMonthlyTrend[];
+}

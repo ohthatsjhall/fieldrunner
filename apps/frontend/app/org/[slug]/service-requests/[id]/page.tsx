@@ -8,6 +8,8 @@ import {
   useServiceRequestFiles,
   useVendorSearchResults,
   useVendorSearch,
+  useVendorAssignment,
+  useAcceptVendor,
 } from '@/hooks/queries';
 
 import { SrLoading } from './components/sr-loading';
@@ -30,6 +32,8 @@ export default function ServiceRequestDetailPage() {
     isLoading: resultsLoading,
   } = useVendorSearchResults(bluefolderId);
   const vendorSearch = useVendorSearch(bluefolderId);
+  const { data: vendorAssignment } = useVendorAssignment(bluefolderId);
+  const acceptVendor = useAcceptVendor(bluefolderId);
 
   function handleTabChange(value: string) {
     if (value === 'files') setFilesEnabled(true);
@@ -80,6 +84,9 @@ export default function ServiceRequestDetailPage() {
                   }
                   reSearchLoading={vendorSearch.isPending}
                   reSearchError={vendorSearch.error?.message ?? null}
+                  assignment={vendorAssignment ?? null}
+                  onAcceptVendor={(params) => acceptVendor.mutate(params)}
+                  acceptLoading={acceptVendor.isPending}
                 />
               ) : null
             }

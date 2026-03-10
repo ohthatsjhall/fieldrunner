@@ -12,6 +12,9 @@ import type {
   VendorSearchRequest,
   VendorSearchResponse,
   VendorSearchSession,
+  VendorAssignment,
+  VendorContactAttempt,
+  ContactStatus,
 } from '@fieldrunner/shared';
 
 import { queryKeys } from './query-keys';
@@ -64,9 +67,53 @@ export function useVendorSearchResults(bluefolderId: number) {
   });
 }
 
+/**
+ * Reads the current vendor assignment for a service request.
+ */
+export function useVendorAssignment(bluefolderId: number) {
+  const { orgId } = useAuth();
+
+  return useApiQuery<VendorAssignment | null>({
+    queryKey: queryKeys.vendorSourcing.assignment(orgId!, bluefolderId),
+    path: `/vendor-sourcing/assignment?serviceRequestBluefolderId=${bluefolderId}`,
+    enabled: !!orgId && bluefolderId > 0,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
+
+type AcceptVendorRequest = {
+  vendorId: string;
+  serviceRequestBluefolderId: number;
+  searchSessionId?: string;
+  rank?: number;
+  score?: number;
+};
+
+/**
+ * Accepts a vendor for a service request. On success, invalidates the
+ * assignment and results queries.
+ */
+export function useAcceptVendor(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<VendorAssignment, AcceptVendorRequest>({
+    path: '/vendor-sourcing/accept',
+    method: 'POST',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.assignment(orgId, bluefolderId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
+    },
+  });
+}
 
 /**
  * Triggers a vendor search (or re-search). On success, invalidates the
@@ -89,6 +136,60 @@ export function useVendorSearch(bluefolderId?: number) {
           queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
         });
       }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Contact Attempt Mutations
+// ---------------------------------------------------------------------------
+
+type LogContactAttemptRequest = {
+  vendorSearchResultId: string;
+  status: ContactStatus;
+  notes?: string;
+};
+
+/**
+ * Logs a contact attempt for a vendor search result. On success, invalidates
+ * the results query so badges update.
+ */
+export function useLogContactAttempt(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<VendorContactAttempt, LogContactAttemptRequest>({
+    path: '/vendor-sourcing/contact-attempt',
+    method: 'POST',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
+    },
+  });
+}
+
+type ClearContactAttemptsRequest = {
+  vendorSearchResultId: string;
+};
+
+/**
+ * Clears all contact attempts for a vendor search result. On success,
+ * invalidates the results query so the row returns to normal.
+ */
+export function useClearContactAttempts(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<{ cleared: boolean }, ClearContactAttemptsRequest>({
+    path: (vars) => `/vendor-sourcing/contact-attempt/${vars.vendorSearchResultId}`,
+    method: 'DELETE',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
     },
   });
 }

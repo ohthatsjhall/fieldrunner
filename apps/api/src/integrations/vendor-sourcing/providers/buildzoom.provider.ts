@@ -272,8 +272,15 @@ const BUILDZOOM_SLUG_MAP: Record<string, string> = {
   // Pools
   pool: 'pool-contractors',
   'swimming pool': 'pool-contractors',
-  // Locks
+  // Locks & Security
   locksmith: 'locksmiths',
+  lock: 'locksmiths',
+  'lock repair': 'locksmiths',
+  security: 'locksmiths',
+  safe: 'locksmiths',
+  'safe services': 'locksmiths',
+  'safe repair': 'locksmiths',
+  vault: 'locksmiths',
   // Elevator
   elevator: 'elevator-contractors',
   // Refrigeration
@@ -340,8 +347,14 @@ export function buildSearchUrl(locationName: string, query: string): string {
     return `https://www.buildzoom.com/${locationSlug}/${knownSlug}`;
   }
 
-  // Fallback: slugify the query directly (may produce invalid URLs)
-  let tradeSlug = query.toLowerCase().replace(/\s+/g, '-');
+  // Fallback: slugify the query directly
+  let tradeSlug = query
+    .toLowerCase()
+    .replace(/[/&]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
   const lastWord = query.toLowerCase().split(/\s+/).pop() ?? '';
   if (
     !tradeSlug.endsWith('s') &&
