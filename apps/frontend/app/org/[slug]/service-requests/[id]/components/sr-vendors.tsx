@@ -2,7 +2,8 @@ import { useState, useRef } from 'react';
 import { useOrganization } from '@clerk/nextjs';
 import {
   Phone, Globe, Star, Search, Loader2, Info, Check, Mail, RefreshCw,
-  MoreHorizontal, UserCheck, Paperclip,
+  MoreHorizontal, UserCheck, Paperclip, PhoneOff, Ban, XCircle, RotateCcw,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { sanitizeFilename, getCustomField, formatDate, formatCurrency } from './utils/sr-formatting';
 import { Button } from '@/app/components/ui/button';
@@ -34,6 +35,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
 import {
@@ -52,7 +54,9 @@ import type {
   VendorCandidate,
   VendorSearchResponse,
   VendorAssignment,
+  ContactStatus,
 } from '@fieldrunner/shared';
+import { useLogContactAttempt, useClearContactAttempts } from '@/hooks/queries';
 
 const PAGE_SIZE = 5;
 
@@ -90,6 +94,28 @@ function getScoreColor(score: number): string {
   if (score >= 70) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
   if (score >= 40) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
   return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+}
+
+function getContactBadge(status: ContactStatus) {
+  switch (status) {
+    case 'no_answer':
+      return { label: 'No Answer', icon: PhoneOff, className: 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400' };
+    case 'unavailable':
+      return { label: 'Unavailable', icon: Ban, className: 'border-orange-300 text-orange-700 dark:border-orange-700 dark:text-orange-400' };
+    case 'declined':
+      return { label: 'Declined', icon: XCircle, className: 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400' };
+  }
+}
+
+function formatTimeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 function buildEmailBody(sr: ServiceRequestDetail, vendorName: string, orgName: string): string {
@@ -299,17 +325,46 @@ function VendorRow({
   candidate: c,
   onAccept,
   isAccepted,
+  onContactAttempt,
+  onClearAttempts,
 }: {
   candidate: VendorCandidate;
   onAccept: (candidate: VendorCandidate) => void;
   isAccepted: boolean;
+  onContactAttempt: (candidate: VendorCandidate, status: ContactStatus) => void;
+  onClearAttempts: (candidate: VendorCandidate) => void;
 }) {
   const phoneDisplay = formatPhone(c.phone, c.phoneRaw);
+  const hasDimming = c.contactAttemptCount > 0 && !isAccepted;
+  const hasAttempts = c.contactAttemptCount > 0;
+  const [expanded, setExpanded] = useState(hasAttempts);
 
   return (
-      <TableRow className={cn('cursor-default', isAccepted && 'bg-green-50/50 dark:bg-green-950/20')}>
+    <>
+      <TableRow className={cn(
+        'cursor-default',
+        isAccepted && 'bg-green-50/50 dark:bg-green-950/20',
+        hasDimming && 'opacity-80',
+      )}>
         <TableCell className="text-center font-mono text-sm text-muted-foreground">
-          {c.rank}
+          <div className="flex items-center justify-center gap-0.5">
+            {hasAttempts ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                aria-label={expanded ? 'Collapse contact history' : 'Expand contact history'}
+              >
+                {expanded
+                  ? <ChevronDown className="size-3.5" />
+                  : <ChevronRight className="size-3.5" />
+                }
+              </button>
+            ) : (
+              <span className="inline-block w-3.5" />
+            )}
+            {c.rank}
+          </div>
         </TableCell>
 
         <TableCell>
@@ -322,6 +377,16 @@ function VendorRow({
                   Accepted
                 </Badge>
               )}
+              {c.latestContactStatus && !isAccepted && (() => {
+                const badge = getContactBadge(c.latestContactStatus);
+                const Icon = badge.icon;
+                return (
+                  <Badge variant="outline" className={cn('gap-1 text-xs', badge.className)}>
+                    <Icon className="size-3" />
+                    {badge.label}
+                  </Badge>
+                );
+              })()}
             </div>
             {c.address && (
               <span className="text-xs text-muted-foreground">{c.address}</span>
@@ -439,10 +504,57 @@ function VendorRow({
                 <UserCheck className="size-4" />
                 Accept Vendor
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onContactAttempt(c, 'no_answer')}>
+                <PhoneOff className="size-4" />
+                No Answer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onContactAttempt(c, 'unavailable')}>
+                <Ban className="size-4" />
+                Unavailable
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onContactAttempt(c, 'declined')}>
+                <XCircle className="size-4" />
+                Declined
+              </DropdownMenuItem>
+              {hasAttempts && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onClearAttempts(c)}>
+                    <RotateCcw className="size-4" />
+                    Reset Status
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
       </TableRow>
+
+      {expanded && hasAttempts && (
+        <TableRow className="bg-muted/30 hover:bg-muted/30">
+          <TableCell />
+          <TableCell colSpan={6}>
+            <div className="space-y-1.5 py-1">
+              {c.contactAttempts.map((a) => {
+                const badge = getContactBadge(a.status);
+                const Icon = badge.icon;
+                return (
+                  <div key={a.id} className="flex items-start gap-2 text-xs">
+                    <Icon className={cn('mt-0.5 size-3 shrink-0', badge.className)} />
+                    <span className="font-medium">{badge.label}</span>
+                    <span className="text-muted-foreground">{formatTimeAgo(a.attemptedAt)}</span>
+                    {a.notes && (
+                      <span className="text-muted-foreground">&mdash; {a.notes}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -494,6 +606,75 @@ function CopyPhoneButton({ phone, name }: { phone: string; name: string }) {
         {copied ? 'Copied!' : phone}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ContactAttemptDialog
+// ---------------------------------------------------------------------------
+
+function ContactAttemptDialog({
+  open,
+  onOpenChange,
+  candidate,
+  status,
+  onSubmit,
+  loading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  candidate: VendorCandidate;
+  status: ContactStatus;
+  onSubmit: (vendorSearchResultId: string, status: ContactStatus, notes?: string) => void;
+  loading: boolean;
+}) {
+  const [notes, setNotes] = useState('');
+  const badge = getContactBadge(status);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Log Contact — {badge.label}</DialogTitle>
+          <DialogDescription>{candidate.name}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Textarea
+            placeholder="Add a note (optional)"
+            maxLength={500}
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={loading}
+            onClick={() => {
+              onSubmit(
+                candidate.vendorSearchResultId,
+                status,
+                notes.trim() || undefined,
+              );
+              onOpenChange(false);
+              setNotes('');
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving&hellip;
+              </>
+            ) : (
+              'Submit'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -579,12 +760,21 @@ export function SrVendors({
   const orgImageUrl = organization?.imageUrl ?? null;
 
   const [selectedCandidate, setSelectedCandidate] = useState<VendorCandidate | null>(null);
+  const [contactDialogState, setContactDialogState] = useState<{
+    candidate: VendorCandidate;
+    status: ContactStatus;
+  } | null>(null);
+
+  const logContactAttempt = useLogContactAttempt(sr.serviceRequestId);
+  const clearContactAttempts = useClearContactAttempts(sr.serviceRequestId);
+
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const prevSessionId = useRef(results?.sessionId);
   if (results?.sessionId !== prevSessionId.current) {
     prevSessionId.current = results?.sessionId;
     setVisibleCount(PAGE_SIZE);
   }
+
   const candidates = results?.candidates ?? [];
   const visible = candidates.slice(0, visibleCount);
   const hasMoreToShow = visibleCount < candidates.length;
@@ -743,6 +933,14 @@ export function SrVendors({
                     candidate={c}
                     onAccept={setSelectedCandidate}
                     isAccepted={assignment?.vendorId === c.vendorId}
+                    onContactAttempt={(candidate, status) =>
+                      setContactDialogState({ candidate, status })
+                    }
+                    onClearAttempts={(candidate) =>
+                      clearContactAttempts.mutate({
+                        vendorSearchResultId: candidate.vendorSearchResultId,
+                      })
+                    }
                   />
                 ))}
               </TableBody>
@@ -794,6 +992,19 @@ export function SrVendors({
           sessionId={results?.sessionId ?? null}
           onAcceptVendor={onAcceptVendor}
           acceptLoading={acceptLoading}
+        />
+      )}
+
+      {contactDialogState && (
+        <ContactAttemptDialog
+          open={!!contactDialogState}
+          onOpenChange={(open) => { if (!open) setContactDialogState(null); }}
+          candidate={contactDialogState.candidate}
+          status={contactDialogState.status}
+          onSubmit={(vendorSearchResultId, status, notes) => {
+            logContactAttempt.mutate({ vendorSearchResultId, status, notes });
+          }}
+          loading={logContactAttempt.isPending}
         />
       )}
     </TooltipProvider>

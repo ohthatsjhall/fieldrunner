@@ -34,6 +34,8 @@ export {
   useVendorSearch,
   useVendorAssignment,
   useAcceptVendor,
+  useLogContactAttempt,
+  useClearContactAttempts,
 } from './use-vendor-sourcing';
 
 // Analytics domain

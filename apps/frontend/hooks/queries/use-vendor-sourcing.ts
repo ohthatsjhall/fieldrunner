@@ -13,6 +13,8 @@ import type {
   VendorSearchResponse,
   VendorSearchSession,
   VendorAssignment,
+  VendorContactAttempt,
+  ContactStatus,
 } from '@fieldrunner/shared';
 
 import { queryKeys } from './query-keys';
@@ -134,6 +136,60 @@ export function useVendorSearch(bluefolderId?: number) {
           queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
         });
       }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Contact Attempt Mutations
+// ---------------------------------------------------------------------------
+
+type LogContactAttemptRequest = {
+  vendorSearchResultId: string;
+  status: ContactStatus;
+  notes?: string;
+};
+
+/**
+ * Logs a contact attempt for a vendor search result. On success, invalidates
+ * the results query so badges update.
+ */
+export function useLogContactAttempt(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<VendorContactAttempt, LogContactAttemptRequest>({
+    path: '/vendor-sourcing/contact-attempt',
+    method: 'POST',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
+    },
+  });
+}
+
+type ClearContactAttemptsRequest = {
+  vendorSearchResultId: string;
+};
+
+/**
+ * Clears all contact attempts for a vendor search result. On success,
+ * invalidates the results query so the row returns to normal.
+ */
+export function useClearContactAttempts(bluefolderId: number) {
+  const { orgId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useApiMutation<{ cleared: boolean }, ClearContactAttemptsRequest>({
+    path: (vars) => `/vendor-sourcing/contact-attempt/${vars.vendorSearchResultId}`,
+    method: 'DELETE',
+    onSuccess: () => {
+      if (!orgId) return;
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.vendorSourcing.results(orgId, bluefolderId),
+      });
     },
   });
 }
